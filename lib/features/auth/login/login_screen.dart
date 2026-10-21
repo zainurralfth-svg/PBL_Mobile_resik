@@ -41,8 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'tipe': tipe,
               'fcm_token': currentToken,
             }),
-          );
-
+          );  
           if (response.statusCode == 200) {
             final result = jsonDecode(response.body);
             if (result['status'] == 'success') {

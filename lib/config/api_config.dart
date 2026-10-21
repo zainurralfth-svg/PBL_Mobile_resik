@@ -1,6 +1,6 @@
 class ApiConfig {
   // 🔧 KONTROL MODE: false = Local/Maintenance, true = Production
-  static const bool isProduction = true;
+  static const bool isProduction = false;
 
   // 🌐 Base URL dinamis berdasarkan mode
   static String get _baseUrl {
@@ -10,7 +10,7 @@ class ApiConfig {
       // 📱 Android Emulator  → 'http://10.0.2.2:8000'
       // 🍎 iOS Simulator/Web → 'http://localhost:8000'
       // 📱 HP Fisikal (WiFi) → 'http://192.168.1.xx:8000' (ganti xx dengan IP Laptop)
-      return 'http://192.168.0.34:8000';
+      return 'http://localhost:8000';
     }
   }
 
