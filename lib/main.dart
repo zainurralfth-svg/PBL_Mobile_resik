@@ -17,34 +17,37 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'config/api_config.dart';
 import 'features/admin/notification_list_screen_admin.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ INITIALIZE FIREBASE
-  await Firebase.initializeApp();
+  if (!kIsWeb) {
+    // ✅ INITIALIZE FIREBASE
+    await Firebase.initializeApp();
 
-  // ✅ SETUP FIREBASE MESSAGING
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
+    // ✅ SETUP FIREBASE MESSAGING
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-  // ✅ REQUEST PERMISSION NOTIFIKASI
-  await messaging.requestPermission(alert: true, badge: true, sound: true);
+    // ✅ REQUEST PERMISSION NOTIFIKASI
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
 
-  // ✅ GET FCM TOKEN
-  String? fcmToken = await messaging.getToken();
-  print('🔵 FCM Token: $fcmToken');
+    // ✅ GET FCM TOKEN
+    String? fcmToken = await messaging.getToken();
+    print('🔵 FCM Token: $fcmToken');
 
-  // ✅ AUTO-UPDATE TOKEN JIKA USER SUDAH LOGIN
-  if (fcmToken != null) {
-    await _updateFcmTokenIfLoggedIn(fcmToken);
+    // ✅ AUTO-UPDATE TOKEN JIKA USER SUDAH LOGIN
+    if (fcmToken != null) {
+      await _updateFcmTokenIfLoggedIn(fcmToken);
+    }
+
+    // ✅ LISTEN TOKEN REFRESH
+    messaging.onTokenRefresh.listen((newToken) async {
+      print('🔄 FCM Token refreshed: $newToken');
+      await _updateFcmTokenIfLoggedIn(newToken);
+    });
   }
-
-  // ✅ LISTEN TOKEN REFRESH
-  messaging.onTokenRefresh.listen((newToken) async {
-    print('🔄 FCM Token refreshed: $newToken');
-    await _updateFcmTokenIfLoggedIn(newToken);
-  });
 
   runApp(
     ChangeNotifierProvider(
