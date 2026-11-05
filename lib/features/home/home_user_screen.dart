@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:resik/features/b3/warga/b3_info_screen.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +17,7 @@ import 'riwayat_penarikan_screen.dart';
 import 'info_tps_screen.dart';
 import 'package:intl/intl.dart';
 import '../notification/notification_list_screen.dart';
+import 'package:resik/features/home/home_user_screen.dart';
 
 // ✅ TAMBAHKAN IMPORT INI:
 import '../shared/jenis_sampah_list_screen.dart';
@@ -121,6 +123,8 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
       targetScreen = const RiwayatSetorScreen();
     } else if (page == 'penarikan') {
       targetScreen = const RiwayatPenarikanScreen();
+    } else if (page == 'b3') {
+      targetScreen = const B3InfoScreen();
     } else {
       return;
     }
@@ -384,7 +388,20 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
       children: [
         Expanded(
           child: _buildBubble(
-            'Riwayat Setor',
+            'B3',
+            Icons.warning_amber_rounded,
+            _activeBankBubble == 'b3',
+            () {
+              setState(() => _activeBankBubble = 'b3');
+              debugPrint('B3 ditekan');
+              _navigateToPage('b3');
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildBubble(
+            'Setor',
             Icons.upload_rounded,
             _activeBankBubble == 'setor',
             () {
@@ -393,10 +410,10 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
             },
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: _buildBubble(
-            'Riwayat Penarikan',
+            'Penarikan',
             Icons.download_rounded,
             _activeBankBubble == 'penarikan',
             () {
