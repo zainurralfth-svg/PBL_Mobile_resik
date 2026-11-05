@@ -684,6 +684,72 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
     );
   }
 
+// ✅ WIDGET KHUSUS BANNER B3
+  Widget _buildB3Banner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8E9), // Warna hijau sangat muda (background)
+        borderRadius: BorderRadius.circular(12),
+        // Menggunakan border solid sebagai alternatif karena package dotted_border belum ada
+        border: Border.all(color: const Color(0xFF81C784), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.eco, color: Color(0xFF4CAF50), size: 24),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pendaftaran B3 dibuka',
+                  style: TextStyle(
+                    color: Color(0xFF1B5E20),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  'Cek ketersediaan periode bulan ini',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // TODO: Arahkan ke halaman B3 Main Screen (yang berisi detail rute/empty state)
+              // Navigator.push(context, MaterialPageRoute(builder: (_) => const B3MainScreen()));
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: Size.zero,
+            ),
+            child: const Text(
+              'Daftar',
+              style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody() {
     return Container(
       margin: const EdgeInsets.only(top: 20),
@@ -760,9 +826,11 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                   ),
                 ),
               ),
+// ✅ TAMBAHKAN BANNER B3 DI SINI
+              _buildB3Banner(),
               const SizedBox(height: 24),
 
-              // ✅ ARTIKEL EDUKASI - dengan callback onViewAll
+              // ✅ ARTIKEL EDUKASI
               _buildSectionTitle(
                 'Artikel Edukasi',
                 onViewAll: () {
@@ -1110,7 +1178,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
     }
   }
 
-  Widget _buildJenisSampahGrid() => GridView.count(
+Widget _buildJenisSampahGrid() => GridView.count(
     shrinkWrap: true,
     physics: const NeverScrollableScrollPhysics(),
     crossAxisCount: 4,
@@ -1118,6 +1186,8 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
     crossAxisSpacing: 12,
     childAspectRatio: 0.8,
     children: [
+      // ✅ TAMBAHKAN ITEM B3
+      _buildJenisSampahItem('B3', Icons.eco),
       _buildJenisSampahItem('Minyak', Icons.local_drink),
       _buildJenisSampahItem('Kertas', Icons.description),
       _buildJenisSampahItem('Logam', Icons.build),
