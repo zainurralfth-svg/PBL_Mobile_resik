@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
-import '../models/B3_model.dart';
+import '../models/b3_model.dart';
 
 
 /// Semua panggilan API B3 untuk warga.

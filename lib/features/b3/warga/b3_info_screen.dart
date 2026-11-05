@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../models/B3_model.dart';
-import '../../../services/B3_service.dart';
+import '../../../models/b3_model.dart';
+import '../../../services/b3_service.dart';
+import '../../home/home_user_screen.dart';
+import '../../home/info_tps_screen.dart';
+import '../../home/laporan_screen.dart';
+import '../../home/riwayat_penarikan_screen.dart';
+import '../../home/riwayat_setor_screen.dart';
 
 // Warna mengikuti desain Sampah B3 (W2 / W3)
 const Color _hijauTua = Color(0xFF2B6A1F);
@@ -91,6 +96,7 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
         onRefresh: _muat,
         child: _buildBody(),
       ),
+      bottomNavigationBar: _bottomBar(),
     );
   }
 
@@ -493,6 +499,197 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
             Icon(Icons.chevron_right, color: _hijauTua),
           ],
         ),
+      ),
+    );
+  }
+
+  // ---------- Bar bawah: bubble B3 / Setor / Penarikan + navigasi ----------
+  // Sama dengan bar bawah di layar Riwayat Setor dan Riwayat Penarikan,
+  // supaya ketiga layar Bank Sampah terasa satu kelompok.
+
+  Widget _bottomBar() {
+    return Container(
+      color: Colors.white,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _bubble('B3', Icons.warning_amber_rounded, true, () {}),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _bubble(
+                      'Setor',
+                      Icons.upload_rounded,
+                      false,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RiwayatSetorScreen(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _bubble(
+                      'Penarikan',
+                      Icons.download_rounded,
+                      false,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RiwayatPenarikanScreen(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _nav(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bubble(
+    String label,
+    IconData icon,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        decoration: BoxDecoration(
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+                )
+              : null,
+          color: isActive ? null : const Color(0xFFE8F5E9),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF4CAF50).withOpacity(0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isActive ? Colors.white : const Color(0xFF2E7D32),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isActive ? Colors.white : const Color(0xFF2E7D32),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _nav() {
+    const items = [
+      (Icons.home_outlined, Icons.home, 'Home'),
+      (Icons.assignment_outlined, Icons.assignment, 'Laporan'),
+      (Icons.store_outlined, Icons.store, 'Bank Sampah'),
+      (Icons.location_on_outlined, Icons.location_on, 'Info TPS'),
+    ];
+
+    void pindah(Widget layar) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => layar),
+        (route) => false,
+      );
+    }
+
+    return Container(
+      height: 65,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(items.length, (index) {
+          final aktif = index == 2; // Bank Sampah
+          final item = items[index];
+
+          return GestureDetector(
+            onTap: () {
+              if (index == 0) {
+                pindah(const HomeUserScreen());
+              } else if (index == 1) {
+                pindah(const LaporanScreen());
+              } else if (index == 3) {
+                pindah(const InfoTpsScreen());
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: aktif
+                  ? const BoxDecoration(
+                      color: Color(0xFF4CAF50),
+                      borderRadius: BorderRadius.all(Radius.circular(20)),
+                    )
+                  : null,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    aktif ? item.$2 : item.$1,
+                    color: aktif ? Colors.white : Colors.grey,
+                    size: 22,
+                  ),
+                  if (aktif) const SizedBox(width: 6),
+                  if (aktif)
+                    Text(
+                      item.$3,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
