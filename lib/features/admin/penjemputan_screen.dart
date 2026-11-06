@@ -1,154 +1,309 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:resik/features/admin/daftar_warga_desa_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:intl/intl.dart';
 import '../../config/api_config.dart';
 import 'home_admin_screen.dart';
-import 'form_penjemputan_screen.dart';
 
 class PenjemputanScreen extends StatefulWidget {
-  const PenjemputanScreen({super.key});
+  final String? initialTab;
+  const PenjemputanScreen({super.key, this.initialTab});
 
   @override
   State<PenjemputanScreen> createState() => _PenjemputanScreenState();
 }
 
 class _PenjemputanScreenState extends State<PenjemputanScreen> {
-  int _selectedIndex = 2;
-  String? _activeBubble;
+  String _activeBubble = 'rute_b3';
 
-  List<dynamic> _penjemputanList = [];
-  bool _isLoading = true;
-  String? _errorMessage;
-  String _filterStatus = 'all';
+  // State Form Reguler
+  final _formKey = GlobalKey<FormState>();
+  final _waktuCtrl = TextEditingController();
+  final _lokasiCtrl = TextEditingController();
+  final _beratCtrl = TextEditingController();
+  final _keteranganCtrl = TextEditingController();
+  File? _imageFile;
+  final _picker = ImagePicker();
+  bool _isFormLoading = false;
+  Map<String, dynamic>? _adminData;
 
   @override
   void initState() {
     super.initState();
-    _activeBubble = 'riwayat';
-    _fetchPenjemputanList();
+    _activeBubble = widget.initialTab ?? 'rute_b3';
+    _loadAdminData();
   }
 
-  Future<void> _fetchPenjemputanList() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final adminData = jsonDecode(prefs.getString('user_data') ?? '{}');
-      final adminId = adminData['id_petugas'];
-
-      final response = await http
-          .get(
-            Uri.parse('${ApiConfig.baseUrl}/riwayat-penjemputan/$adminId'),
-            headers: {'Accept': 'application/json'},
-          )
-          .timeout(const Duration(seconds: 10));
-
-      debugPrint("Status: ${response.statusCode}");
-      debugPrint("Response: ${response.body}");
-
-      if (mounted) {
-        if (response.statusCode == 200) {
-          final result = jsonDecode(response.body);
-          if (result['status'] == 'success') {
-            setState(() {
-              _penjemputanList = result['data'] ?? [];
-              _isLoading = false;
-            });
-          } else {
-            setState(() {
-              _errorMessage = result['message'] ?? 'Gagal memuat data';
-              _isLoading = false;
-            });
-          }
-        } else {
-          setState(() {
-            _errorMessage = 'Server error: ${response.statusCode}';
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("HTTP Error: $e");
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Koneksi error: $e';
-          _isLoading = false;
-        });
-      }
-    }
+  @override
+  void dispose() {
+    _waktuCtrl.dispose();
+    _lokasiCtrl.dispose();
+    _beratCtrl.dispose();
+    _keteranganCtrl.dispose();
+    super.dispose();
   }
 
-  void _onBubbleTap(String bubble) {
-    setState(() => _activeBubble = bubble);
-
-    if (bubble == 'form') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const FormPenjemputanScreen()),
-      ).then((result) {
-        if (result == true) {
-          _fetchPenjemputanList();
-        }
+  Future<void> _loadAdminData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userDataStr = prefs.getString('user_data');
+    if (userDataStr != null && mounted) {
+      final userData = jsonDecode(userDataStr);
+      setState(() {
+        _adminData = userData;
+        _waktuCtrl.text = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
       });
     }
   }
 
-  void _showImagePopup(BuildContext context, String imageUrl) {
-    showDialog(
+  void _onBubbleTap(String bubble) {
+    setState(() {
+      _activeBubble = bubble;
+    });
+  }
+
+  // --- LOGIKA FORM REGULER ---
+  Future<void> _pickImage(ImageSource source) async {
+    final picked = await _picker.pickImage(
+      source: source,
+      maxWidth: 1800,
+      maxHeight: 1800,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      setState(() => _imageFile = File(picked.path));
+    }
+  }
+
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Center(
-                    child: Icon(
-                      Icons.broken_image_outlined,
-                      size: 80,
-                      color: Colors.white54,
-                    ),
-                  ),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-            Positioned(
-              top: MediaQuery.of(dialogContext).padding.top + 16,
-              right: 16,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(dialogContext),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+              const SizedBox(height: 16),
+              const Text(
+                'Pilih Sumber Foto',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
                 ),
+              ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildImageSourceButton(
+                        icon: Icons.camera_alt_rounded,
+                        label: 'Kamera',
+                        color: const Color(0xFF2E7D32),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _pickImage(ImageSource.camera);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildImageSourceButton(
+                        icon: Icons.photo_library_rounded,
+                        label: 'Galeri',
+                        color: const Color(0xFF1976D2),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _pickImage(ImageSource.gallery);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildImageSourceButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isFormLoading = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showSnackBar('Lokasi tidak aktif. Silakan aktifkan GPS.', Colors.red);
+        setState(() => _isFormLoading = false);
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showSnackBar('Izin lokasi ditolak', Colors.red);
+          setState(() => _isFormLoading = false);
+          return;
+        }
+      }
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          Placemark place = placemarks[0];
+          String alamat = [
+            place.street,
+            place.locality,
+            place.administrativeArea,
+            place.postalCode,
+            place.country,
+          ].where((e) => e != null && e.isNotEmpty).join(', ');
+          setState(
+            () => _lokasiCtrl.text = alamat.isEmpty
+                ? '${position.latitude}, ${position.longitude}'
+                : alamat,
+          );
+        } else {
+          setState(
+            () => _lokasiCtrl.text =
+                '${position.latitude}, ${position.longitude}',
+          );
+        }
+      } catch (e) {
+        setState(
+          () => _lokasiCtrl.text = '${position.latitude}, ${position.longitude}',
+        );
+      }
+    } catch (e) {
+      _showSnackBar('Gagal mendapatkan lokasi: $e', Colors.red);
+    } finally {
+      setState(() => _isFormLoading = false);
+    }
+  }
+
+  void _showSnackBar(String msg, Color color) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: color,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _submitPenjemputan() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isFormLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final adminData = jsonDecode(prefs.getString('user_data') ?? '{}');
+      final adminId = adminData['id_petugas'];
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConfig.baseUrl}/penjemputan/store'),
+      );
+      request.headers.addAll({'Accept': 'application/json'});
+      request.fields['id_petugas'] = adminId.toString();
+      request.fields['nama_admin'] =
+          _adminData?['nama'] ?? _adminData?['nama_lengkap'] ?? 'Admin';
+      request.fields['waktu'] = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+      request.fields['lokasi'] = _lokasiCtrl.text;
+      request.fields['berat'] = _beratCtrl.text;
+      request.fields['keterangan'] = _keteranganCtrl.text;
+      request.fields['status'] = 'diproses';
+      if (_imageFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'foto',
+            _imageFile!.path,
+            filename: 'penjemputan_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          ),
+        );
+      }
+      var streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      var response = await http.Response.fromStream(streamedResponse);
+      var result = jsonDecode(response.body);
+
+      if (mounted) {
+        setState(() => _isFormLoading = false);
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          _showSnackBar('Penjemputan berhasil diajukan', const Color(0xFF2E7D32));
+          _waktuCtrl.clear();
+          _lokasiCtrl.clear();
+          _beratCtrl.clear();
+          _keteranganCtrl.clear();
+          setState(() => _imageFile = null);
+        } else {
+          _showSnackBar(result['message'] ?? 'Gagal mengajukan penjemputan', Colors.red);
+        }
+      }
+    } catch (e) {
+      setState(() => _isFormLoading = false);
+      _showSnackBar('Koneksi error: $e', Colors.red);
+    }
   }
 
   @override
@@ -210,133 +365,253 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
       ),
       body: Column(
         children: [
-          // BUBBLE TABS
+          // BUBBLE TABS (REGULER & RUTE B3)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             color: Colors.white,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildBubble(
-                    'Ajukan Penjemputan',
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildBubble(
+                    'Reguler',
                     Icons.add_circle_outline_rounded,
                     _activeBubble == 'form',
                     () => _onBubbleTap('form'),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildBubble(
-                    'Riwayat Penjemputan',
-                    Icons.history_rounded,
-                    _activeBubble == 'riwayat',
-                    () => _onBubbleTap('riwayat'),
+                  const SizedBox(width: 12),
+                  _buildBubble(
+                    'Rute B3',
+                    Icons.eco,
+                    _activeBubble == 'rute_b3',
+                    () => _onBubbleTap('rute_b3'),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // FILTER TABS
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.white,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('Semua', 'all'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Menunggu', 'pending'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Disetujui', 'approved'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Ditolak', 'rejected'),
                 ],
               ),
             ),
           ),
-
-          // LIST DATA
+          // KONTEN SESUAI TAB YANG DIPILIH
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _fetchPenjemputanList,
-              color: const Color(0xFF2E7D32),
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF2E7D32),
-                      ),
-                    )
-                  : _errorMessage != null
-                  ? _buildErrorState()
-                  : _buildContent(),
-            ),
+            child: _activeBubble == 'form'
+                ? _buildKontenFormReguler()
+                : _buildKontenRuteB3(),
           ),
-
-          // BOTTOM NAV
-          _buildBottomNav(),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
+  // --- KONTEN FORM REGULER ---
+  Widget _buildKontenFormReguler() {
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20),
       children: [
-        SizedBox(
-          height: MediaQuery.of(context).size.height - 300,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+        Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('Detail Penjemputan', 'Lengkapi data penjemputan'),
+              const SizedBox(height: 16),
+              _buildFotoUpload(),
+              const SizedBox(height: 16),
+              _buildWaktuField(),
+              const SizedBox(height: 16),
+              _buildLokasiField(),
+              const SizedBox(height: 16),
+              _buildBeratField(),
+              const SizedBox(height: 16),
+              _buildKeteranganField(),
+              const SizedBox(height: 24),
+              _buildSubmitButton(),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title, String subtitle) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 20,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+            ),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFotoUpload() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Foto Lokasi (Opsional)',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1B5E20),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _showImageSourceDialog,
+          child: Container(
+            height: 180,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _imageFile != null ? const Color(0xFF4CAF50) : Colors.grey.shade200,
+              ),
+            ),
+            child: _imageFile != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: Image.file(_imageFile!, fit: BoxFit.cover),
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.add_a_photo_rounded,
+                          size: 32,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Upload Foto Lokasi',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1B5E20),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Format: JPG, PNG (Maks 10MB)',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWaktuField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Waktu Pengajuan',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1B5E20),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.access_time_rounded, color: Color(0xFF2E7D32), size: 16),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _waktuCtrl.text.isEmpty ? 'Otomatis' : _waktuCtrl.text,
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLokasiField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Lokasi Penjemputan',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1B5E20),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _isFormLoading ? null : _getCurrentLocation,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.error_outline_rounded,
-                    size: 60,
-                    color: Colors.red.shade400,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Terjadi Kesalahan',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                const Icon(Icons.location_on_rounded, color: Color(0xFF2E7D32), size: 18),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Text(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    _lokasiCtrl.text.isEmpty
+                        ? 'Klik untuk mendapatkan lokasi'
+                        : _lokasiCtrl.text,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A)),
                   ),
                 ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _fetchPenjemputanList,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Coba Lagi'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+                const Icon(Icons.my_location_rounded, color: Color(0xFF2E7D32), size: 16),
               ],
             ),
           ),
@@ -345,385 +620,254 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
     );
   }
 
-  Widget _buildContent() {
-    final filteredList = _filterStatus == 'all'
-        ? _penjemputanList
-        : _penjemputanList.where((item) {
-            final status = (item['status'] ?? '').toString().toLowerCase();
-            if (_filterStatus == 'pending')
-              return status == 'diproses' || status == 'pending';
-            if (_filterStatus == 'approved') return status == 'disetujui';
-            if (_filterStatus == 'rejected') return status == 'ditolak';
-            return true;
-          }).toList();
-
-    if (filteredList.isEmpty) {
-      return ListView(
-        children: [
-          SizedBox(
-            height: MediaQuery.of(context).size.height - 300,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping_rounded,
-                      size: 60,
-                      color: Color(0xFF2E7D32),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _filterStatus == 'all'
-                        ? 'Belum ada penjemputan'
-                        : 'Tidak ada penjemputan ${_filterStatus.toLowerCase()}',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tarik ke bawah untuk refresh',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: filteredList.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) =>
-          _buildPenjemputanCard(filteredList[index]),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _filterStatus == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _filterStatus = value;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
-                )
-              : null,
-          color: isSelected ? null : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(20),
-          border: isSelected ? null : Border.all(color: Colors.grey.shade300),
-        ),
-        child: Text(
-          label,
+  Widget _buildBeratField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Estimasi Berat Sampah',
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey[700],
             fontSize: 12,
             fontWeight: FontWeight.w600,
+            color: Color(0xFF1B5E20),
           ),
         ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: TextFormField(
+            controller: _beratCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              hintText: '0',
+              prefixIcon: Icon(Icons.scale_rounded, color: Color(0xFF2E7D32)),
+              suffixText: 'kg',
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Berat wajib diisi';
+              if (double.tryParse(v) == null) return 'Masukkan angka valid';
+              return null;
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKeteranganField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Keterangan (Opsional)',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1B5E20),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: TextFormField(
+            controller: _keteranganCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Jenis sampah, akses lokasi, dll',
+              prefixIcon: Icon(Icons.notes_rounded, color: Color(0xFF2E7D32)),
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: _isFormLoading ? null : _submitPenjemputan,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2E7D32),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: _isFormLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text(
+                'Kirim Pengajuan',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
       ),
     );
   }
 
-  Widget _buildPenjemputanCard(Map<String, dynamic> item) {
-    final String lokasi = item['lokasi'] ?? '-';
-    final double berat = (item['berat'] ?? 0).toDouble();
-    final String keterangan = item['keterangan'] ?? '-';
-    final String status = item['status'] ?? 'diproses';
-    final String waktu = _formatTanggal(item['waktu'] ?? item['created_at']);
-    String? fotoUrl = item['foto'];
-    if (fotoUrl != null && !fotoUrl.startsWith('http')) {
-      fotoUrl = '${ApiConfig.storageUrl}/$fotoUrl';
-    }
-
-    Color statusColor;
-    String statusText;
-    IconData statusIcon;
-    Color statusBgColor;
-
-    switch (status.toLowerCase()) {
-      case 'disetujui':
-        statusColor = const Color(0xFF2E7D32);
-        statusBgColor = const Color(0xFFE8F5E9);
-        statusText = 'DISETUJUI';
-        statusIcon = Icons.check_circle_rounded;
-        break;
-      case 'ditolak':
-        statusColor = Colors.red.shade700;
-        statusBgColor = Colors.red.shade50;
-        statusText = 'DITOLAK';
-        statusIcon = Icons.cancel_rounded;
-        break;
-      default:
-        statusColor = Colors.orange.shade700;
-        statusBgColor = Colors.orange.shade50;
-        statusText = 'DIPROSES';
-        statusIcon = Icons.pending_rounded;
-    }
-
-    return Container(
+  // --- KONTEN RUTE B3 ---
+  Widget _buildKontenRuteB3() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: status.toLowerCase() == 'diproses'
-              ? Colors.orange.withOpacity(0.3)
-              : Colors.grey.shade200,
-          width: status.toLowerCase() == 'diproses' ? 1.5 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // FOTO
-          if (fotoUrl != null && fotoUrl.isNotEmpty) ...[
-            GestureDetector(
-              onTap: () => _showImagePopup(context, fotoUrl!),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      fotoUrl!,
-                      width: double.infinity,
-                      height: 180,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          height: 180,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Color(0xFF2E7D32),
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 180,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Icon(
-                              Icons.broken_image_rounded,
-                              size: 40,
-                              color: Colors.grey.shade400,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.zoom_in_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Rute Kec. Bagor',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1B5E20),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Periode Oktober 2026 • Kamis, 29 Okt 2026',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text('Progres rute', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('3 / 8 warga', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
                 ],
               ),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // HEADER
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      statusColor.withOpacity(0.2),
-                      statusColor.withOpacity(0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(statusIcon, color: statusColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Penjemputan Sampah',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      waktu,
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                    ),
-                  ],
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: const LinearProgressIndicator(
+                  value: 3 / 8,
+                  backgroundColor: Color(0xFFE8F5E9),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+                  minHeight: 8,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: statusBgColor,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
-                ),
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: statusColor,
-                    letterSpacing: 0.3,
-                  ),
-                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildB3StatCard('8', 'Warga', const Color(0xFFF1F8E9), const Color(0xFF2E7D32))),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildB3StatCard('62', 'Est. kg', const Color(0xFFE3F2FD), const Color(0xFF1976D2))),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildB3StatCard('3', 'Dijemput', const Color(0xFFFFF3E0), const Color(0xFFF57C00))),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Divider(color: Colors.grey.shade200, height: 1),
-          const SizedBox(height: 12),
-
-          // LOKASI
-          _buildInfoRow('Lokasi', lokasi, Icons.location_on_rounded),
-
-          // BERAT
-          _buildInfoRow(
-            'Estimasi Berat',
-            _formatBerat(berat),
-            Icons.scale_rounded,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
           ),
-
-          // KETERANGAN
-          if (keterangan != '-' && keterangan.isNotEmpty)
-            _buildInfoRow('Keterangan', keterangan, Icons.note_alt_rounded),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Desa dalam Rute',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+              ),
+              const SizedBox(height: 12),
+              _buildDesaB3Item('Desa Bagor', '3 / 4 warga dijemput • est. 24 kg'),
+              _buildDesaB3Item('Desa Balongrejo', '0 / 2 warga dijemput • est. 18 kg'),
+              _buildDesaB3Item('Desa Kedungsumber', '0 / 1 warga dijemput • est. 12 kg'),
+              _buildDesaB3Item('Desa Banaran', '0 / 1 warga dijemput • est. 8 kg'),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildInfoRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildB3StatCard(String value, String label, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12)),
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(icon, size: 12, color: const Color(0xFF2E7D32)),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1A1A),
-              ),
-            ),
-          ),
+          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 11, color: textColor, fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
 
-  Widget _buildBubble(
-    String label,
-    IconData icon,
-    bool isActive,
-    VoidCallback onTap,
-  ) {
+  Widget _buildDesaB3Item(String namaDesa, String info) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        title: Text(namaDesa, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Text(info, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text('Dijadwalkan', style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+              SizedBox(width: 4),
+              Icon(Icons.chevron_right, size: 14, color: Color(0xFF2E7D32)),
+            ],
+          ),
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DaftarWargaDesaScreen(namaDesa: namaDesa),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBubble(String label, IconData icon, bool isActive, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
         decoration: BoxDecoration(
-          gradient: isActive
-              ? const LinearGradient(
-                  colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
-                )
-              : null,
-          color: isActive ? null : const Color(0xFFE8F5E9),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF2E7D32).withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
+          color: isActive ? const Color(0xFF2E7D32) : const Color(0xFFE8F5E9),
+          borderRadius: BorderRadius.circular(25),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
@@ -731,132 +875,17 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
               color: isActive ? Colors.white : const Color(0xFF2E7D32),
             ),
             const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? Colors.white : const Color(0xFF2E7D32),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-                overflow: TextOverflow.ellipsis,
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.white : const Color(0xFF2E7D32),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildBottomNav() {
-    final items = [
-      {'icon': Icons.home_outlined, 'active': Icons.home, 'label': 'Beranda'},
-      {'icon': Icons.qr_code_scanner, 'active': Icons.qr_code, 'label': 'Scan'},
-      {
-        'icon': Icons.local_shipping,
-        'active': Icons.local_shipping,
-        'label': 'Penjemputan',
-      },
-      {
-        'icon': Icons.history_outlined,
-        'active': Icons.history,
-        'label': 'Riwayat',
-      },
-    ];
-
-    return Container(
-      height: 65,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(items.length, (index) {
-          final isActive = _selectedIndex == index;
-          final item = items[index];
-
-          return GestureDetector(
-            onTap: () {
-              if (index == 0) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HomeAdminScreen()),
-                  (route) => false,
-                );
-              } else if (index == 1) {
-                // Scan
-              } else if (index == 3) {
-                // Riwayat
-              }
-              setState(() => _selectedIndex = index);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: isActive
-                  ? BoxDecoration(
-                      color: const Color(0xFF2E7D32),
-                      borderRadius: BorderRadius.circular(20),
-                    )
-                  : null,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isActive
-                        ? item['active'] as IconData
-                        : item['icon'] as IconData,
-                    color: isActive ? Colors.white : Colors.grey,
-                    size: 22,
-                  ),
-                  if (isActive) const SizedBox(width: 6),
-                  if (isActive)
-                    Text(
-                      item['label'] as String,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  String _formatTanggal(String? tanggalStr) {
-    if (tanggalStr == null || tanggalStr.isEmpty) return '-';
-
-    try {
-      DateTime dt;
-
-      if (tanggalStr.endsWith('Z')) {
-        dt = DateTime.parse(tanggalStr);
-        dt = dt.add(const Duration(hours: 7));
-      } else {
-        dt = DateTime.parse(tanggalStr);
-      }
-
-      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return tanggalStr;
-    }
-  }
-
-  String _formatBerat(double berat) {
-    if (berat == berat.toInt()) {
-      return '${berat.toInt()} kg';
-    }
-    return '${berat.toStringAsFixed(1)} kg';
   }
 }
