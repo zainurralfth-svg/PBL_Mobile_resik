@@ -37,10 +37,21 @@ class B3FormScreen extends StatefulWidget {
   final String periodeLabel;
   final String tanggalJemput;
 
+  /// Desa yang dilayani periode ini (dari W2: `p.desa`).
+  /// Kalau null -> mode contoh (form terisi data contoh seperti Figma).
+  final List<String>? desaOptions;
+
+  /// Batas berat per pendaftaran (dari W2: `p.beratMin` / `p.beratMax`).
+  final double beratMin;
+  final double beratMax;
+
   const B3FormScreen({
     super.key,
     this.periodeLabel = 'Periode Oktober 2026 · Rute Kec. Bogor',
     this.tanggalJemput = 'Kamis, 29 Okt 2026',
+    this.desaOptions,
+    this.beratMin = 2,
+    this.beratMax = 20,
   });
 
   @override
@@ -55,12 +66,12 @@ class _B3FormScreenState extends State<B3FormScreen> {
   static const _chipIdle = Color(0xFFEAE4BE);
   static const _banner = Color(0xFFE9E3B8);
 
-  static const double _minBerat = 2;
-  static const double _maxBerat = 20;
+  double get _minBerat => widget.beratMin;
+  double get _maxBerat => widget.beratMax;
 
-  /// true = form terisi contoh seperti di Figma (enak buat cek tampilan).
-  /// Ganti false kalau mau form kosong.
-  static const bool _isiContoh = true;
+  /// Form terisi contoh (seperti Figma) hanya saat dibuka sendiri tanpa data
+  /// periode. Kalau dibuka dari W2 (desaOptions diisi), form kosong.
+  bool get _isiContoh => widget.desaOptions == null;
 
   static const _jenisOptions = <_JenisB3>[
     _JenisB3('Baterai', Icons.battery_charging_full_rounded),
@@ -70,13 +81,15 @@ class _B3FormScreenState extends State<B3FormScreen> {
     _JenisB3('Aerosol / Cat', Icons.format_paint_outlined),
   ];
 
-  // Contoh daftar desa (nanti diganti data dari backend).
-  static const _desaOptions = <String>[
+  // Contoh daftar desa, dipakai kalau W2 belum mengoper desaOptions.
+  static const _desaContoh = <String>[
     'Desa Bogor',
     'Desa Wilangan',
     'Desa Sukomoro',
     'Desa Kertosono',
   ];
+
+  List<String> get _desaOptions => widget.desaOptions ?? _desaContoh;
 
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _beratCtrl;
@@ -95,7 +108,9 @@ class _B3FormScreenState extends State<B3FormScreen> {
       text: _isiContoh ? 'Jl. Wilangan Kulon No. 12' : '',
     );
     _selectedJenis = _isiContoh ? {'Baterai', 'Lampu'} : {};
-    _desa = _isiContoh ? 'Desa Bogor' : null;
+    _desa = (_isiContoh && _desaOptions.contains('Desa Bogor'))
+        ? 'Desa Bogor'
+        : null;
   }
 
   @override
@@ -105,6 +120,8 @@ class _B3FormScreenState extends State<B3FormScreen> {
     _keteranganCtrl.dispose();
     super.dispose();
   }
+
+  String _fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
 
   void _onLanjut() {
     FocusScope.of(context).unfocus();
@@ -322,16 +339,16 @@ class _B3FormScreenState extends State<B3FormScreen> {
             final n = double.tryParse((v ?? '').replaceAll(',', '.').trim());
             if (n == null) return 'Isi estimasi berat';
             if (n < _minBerat || n > _maxBerat) {
-              return 'Berat harus antara ${_minBerat.toInt()}–${_maxBerat.toInt()} kg';
+              return 'Berat harus antara ${_fmt(_minBerat)}–${_fmt(_maxBerat)} kg';
             }
             return null;
           },
         ),
-        const Padding(
-          padding: EdgeInsets.only(top: 6, left: 4),
+        Padding(
+          padding: const EdgeInsets.only(top: 6, left: 4),
           child: Text(
-            'Minimal 2 kg, maksimal 20 kg per pendaftaran',
-            style: TextStyle(color: Color(0xFF6B7A5E), fontSize: 11),
+            'Minimal ${_fmt(_minBerat)} kg, maksimal ${_fmt(_maxBerat)} kg per pendaftaran',
+            style: const TextStyle(color: Color(0xFF6B7A5E), fontSize: 11),
           ),
         ),
       ],

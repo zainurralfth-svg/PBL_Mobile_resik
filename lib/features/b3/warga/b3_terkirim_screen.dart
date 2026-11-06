@@ -1,89 +1,108 @@
-// lib/features/b3/warga/b3_konfirmasi_screen.dart
+// lib/features/b3/warga/b3_terkirim_screen.dart
 //
-// W5 · Konfirmasi Pendaftaran B3 (warga) — TAMPILAN SAJA.
-// Tombol "Kirim Pendaftaran" belum memanggil backend.
-// Alur: W4 Form -> [W5 Konfirmasi] -> W6 Terkirim
+// W6 · Pendaftaran Terkirim (warga) — TAMPILAN SAJA.
+// Nomor pendaftaran & status masih contoh (belum dari backend).
+// Alur: W5 Konfirmasi -> [W6 Terkirim] -> Riwayat B3 / Beranda
 
 import 'package:flutter/material.dart';
 
 import 'b3_form_screen.dart' show B3FormData;
-import 'b3_konfirmasi_screen.dart';
 
-class B3KonfirmasiScreen extends StatelessWidget {
-  /// Kalau tidak diisi, dipakai data contoh (bisa dibuka sendiri tanpa W4).
+class B3TerkirimScreen extends StatelessWidget {
+  /// Kalau tidak diisi, dipakai data contoh (bisa dibuka sendiri).
   final B3FormData data;
 
-  const B3KonfirmasiScreen({super.key, this.data = const B3FormData()});
+  /// Contoh. Nanti diisi dari response backend.
+  final String noPendaftaran;
+  final String status;
+
+  const B3TerkirimScreen({
+    super.key,
+    this.data = const B3FormData(),
+    this.noPendaftaran = '#B3-00021',
+    this.status = 'Terdaftar',
+  });
 
   static const _green = Color(0xFF2E7D32);
   static const _greenDark = Color(0xFF1B5E20);
   static const _cream = Color(0xFFFAF4DC);
   static const _card = Color(0xFFFFFDF5);
-  static const _iconTile = Color(0xFFE3EFD9);
-  static const _warnBg = Color(0xFFF6EBC4);
-  static const _warnFg = Color(0xFF7A5B00);
-
-  void _kirim(BuildContext context) {
-    // TODO: panggil backend di sini nanti, lalu pindah ke W6 kalau sukses.
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => B3KonfirmasiScreen(data: data)),
-    );
-  }
+  static const _badgeBg = Color(0xFFEAE4BE);
 
   @override
   Widget build(BuildContext context) {
-    final rows = <_Row>[
-      _Row(Icons.event_note_rounded, 'Periode', data.periodeLabel),
-      _Row(Icons.recycling_rounded, 'Jenis B3', data.jenisText),
-      _Row(Icons.scale_outlined, 'Estimasi berat', data.beratText),
-      _Row(
-        Icons.place_outlined,
-        'Alamat jemput',
-        '${data.alamat}, ${data.desa}',
-      ),
-      _Row(Icons.local_shipping_outlined, 'Tanggal jemput', data.tanggalJemput),
-      if (data.keterangan.isNotEmpty)
-        _Row(Icons.notes_rounded, 'Keterangan', data.keterangan),
-    ];
-
     return Scaffold(
       backgroundColor: _cream,
-      appBar: AppBar(
-        backgroundColor: _green,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Konfirmasi Pendaftaran',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
-      ),
       body: SafeArea(
         child: Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 56, 16, 16),
                 child: Column(
                   children: [
-                    _summaryCard(rows),
-                    const SizedBox(height: 14),
-                    _warningBox(),
+                    _checkIcon(),
+                    const SizedBox(height: 22),
+                    const Text(
+                      'Pendaftaran Terkirim',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: _greenDark,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Petugas DLH akan menjemput pada',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: _greenDark.withValues(alpha: 0.65),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      data.tanggalJemput,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: _greenDark,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    _summaryCard(),
                   ],
                 ),
               ),
             ),
-            _actionBar(context),
+            _actions(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _summaryCard(List<_Row> rows) {
+  Widget _checkIcon() {
+    return Container(
+      width: 124,
+      height: 124,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _green.withValues(alpha: 0.12),
+      ),
+      child: Container(
+        width: 92,
+        height: 92,
+        decoration: const BoxDecoration(shape: BoxShape.circle, color: _green),
+        child: const Icon(Icons.check_rounded, size: 52, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _summaryCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(14),
@@ -97,132 +116,115 @@ class B3KonfirmasiScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            _rowTile(rows[i]),
-            if (i != rows.length - 1)
-              Divider(height: 1, color: _greenDark.withValues(alpha: 0.08)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _rowTile(_Row r) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: _iconTile,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(r.icon, size: 18, color: _green),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  r.label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _greenDark.withValues(alpha: 0.55),
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'No. Pendaftaran',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: _greenDark.withValues(alpha: 0.55),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      noPendaftaran,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: _greenDark,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  r.value,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _badgeBg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  status,
                   style: const TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: _greenDark,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: _greenDark.withValues(alpha: 0.1)),
+          ),
+          Row(
+            children: [
+              const Icon(Icons.recycling_rounded, size: 18, color: _green),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${data.jenisText} · Est. ${data.beratText}',
+                  style: const TextStyle(fontSize: 12.5, color: _greenDark),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _warningBox() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _warnBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded, size: 20, color: _warnFg),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Kemas B3 terpisah dari sampah lain, jangan dicampur, dan '
-              'siapkan di depan rumah pada hari penjemputan. '
-              'Barang akan ditimbang petugas.',
-              style: TextStyle(fontSize: 12, height: 1.45, color: _warnFg),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionBar(BuildContext context) {
+  Widget _actions(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
       color: _cream,
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: SizedBox(
-              height: 52,
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _greenDark,
-                  backgroundColor: _card,
-                  side: BorderSide(color: _green.withValues(alpha: 0.4)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(26),
-                  ),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () {
+                // TODO: arahkan ke Riwayat B3 (W7) nanti.
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _green,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(26),
                 ),
-                child: const Text(
-                  'Ubah',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
+              ),
+              child: const Text(
+                'Lihat Status',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 3,
-            child: SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                onPressed: () => _kirim(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _green,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(26),
-                  ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton(
+              // Sementara: tutup semua halaman B3, balik ke halaman pertama.
+              onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _greenDark,
+                backgroundColor: _card,
+                side: BorderSide(color: _green.withValues(alpha: 0.4)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(26),
                 ),
-                child: const Text(
-                  'Kirim Pendaftaran',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
+              ),
+              child: const Text(
+                'Kembali ke Beranda',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -230,11 +232,4 @@ class B3KonfirmasiScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Row {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _Row(this.icon, this.label, this.value);
 }

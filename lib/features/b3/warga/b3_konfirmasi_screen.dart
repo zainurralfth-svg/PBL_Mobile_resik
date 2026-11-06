@@ -7,7 +7,7 @@
 import 'package:flutter/material.dart';
 
 import 'b3_form_screen.dart' show B3FormData;
-import 'b3_konfirmasi_screen.dart';
+import 'b3_terkirim_screen.dart';
 
 class B3KonfirmasiScreen extends StatelessWidget {
   /// Kalau tidak diisi, dipakai data contoh (bisa dibuka sendiri tanpa W4).
@@ -27,7 +27,7 @@ class B3KonfirmasiScreen extends StatelessWidget {
     // TODO: panggil backend di sini nanti, lalu pindah ke W6 kalau sukses.
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => B3KonfirmasiScreen(data: data)),
+      MaterialPageRoute(builder: (_) => B3TerkirimScreen(data: data)),
     );
   }
 
