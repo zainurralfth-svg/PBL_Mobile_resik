@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resik/features/admin/penjemputan_screen.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -284,14 +285,10 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     }
   }
 
-  void _onNavTap(int index) {
+void _onNavTap(int index) {
     setState(() {
       _selectedIndex = index;
-      if (index == 3 && _activeRiwayatBubble == null) {
-        _activeRiwayatBubble = 'setor';
-      }
     });
-
     if (index == 1) {
       Navigator.push(
         context,
@@ -300,10 +297,13 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     } else if (index == 2) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const FormPenjemputanScreen()),
-      ).then((result) {
-        if (result == true) setState(() {});
-      });
+        MaterialPageRoute(builder: (_) => const PenjemputanScreen()),
+      );
+    } else if (index == 3) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RiwayatSetorAdminScreen()),
+      );
     }
   }
 
@@ -673,7 +673,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     );
   }
 
-  Widget _buildBody() {
+Widget _buildBody() {
     return Container(
       margin: const EdgeInsets.only(top: 20),
       padding: const EdgeInsets.all(16),
@@ -685,8 +685,12 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // STATISTIK SECTION (Langsung di paling atas - Clean!)
+            // STATISTIK SECTION 
             _buildStatistikSection(),
+            const SizedBox(height: 16),
+
+            // ✅ TAMBAHKAN BANNER B3 DI SINI
+            _buildB3AdminBanner(),
             const SizedBox(height: 24),
 
             // Artikel Edukasi
@@ -697,6 +701,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                 MaterialPageRoute(builder: (_) => const ArtikelListScreen()),
               ),
             ),
+// ... lanjutan kode sebelumnya ...
             const SizedBox(height: 12),
             _isLoadingArtikel
                 ? const Center(child: CircularProgressIndicator())
@@ -801,6 +806,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
               ),
               const SizedBox(height: 12),
 
+
               // TAMBAH: Info periode
               if (stats['periode'] != null)
                 Padding(
@@ -902,6 +908,105 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
           ),
         );
       },
+    );
+  }
+
+// ✅ WIDGET KHUSUS BANNER B3 ADMIN
+  Widget _buildB3AdminBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        // Menggunakan border solid warna oranye menyesuaikan desain UI
+        border: Border.all(color: Colors.orange.shade300, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.eco, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Penjemputan B3 Hari Ini',
+                      style: TextStyle(
+                        color: Color(0xFF1B5E20),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Rute Kec. Bagor - 29 Okt 2026',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Sudah dijemput', style: TextStyle(fontSize: 11, color: Colors.grey)),
+              const Text('3 / 8 warga', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: const LinearProgressIndicator(
+              value: 3 / 8,
+              backgroundColor: Color(0xFFE8F5E9), // Background progress bar hijau muda
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)), // Progress bar hijau tua
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const PenjemputanScreen(
+        initialTab: 'rute_b3',
+      ),
+    ),
+  );
+},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Mulai Rute',
+                style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
