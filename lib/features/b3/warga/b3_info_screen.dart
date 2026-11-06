@@ -8,11 +8,12 @@ import '../../home/info_tps_screen.dart';
 import '../../home/laporan_screen.dart';
 import '../../home/riwayat_penarikan_screen.dart';
 import '../../home/riwayat_setor_screen.dart';
+import 'b3_form_screen.dart';
 
 // Warna mengikuti desain Sampah B3 (W2 / W3)
-const Color _hijauTua = Color(0xFF2B6A1F);
-const Color _krem = Color(0xFFFAF4DB);
-const Color _hijauChip = Color(0xFFE8EBC9);
+const Color _hijauTua = Color(0xFF2E7D32);
+const Color _krem = Color(0xFFFAF4DC);
+const Color _hijauChip = Color(0xFFEAE4BE);
 const Color _hijauBadge = Color(0xFFCDE8C0);
 
 /// Layar "Sampah B3" untuk warga.
@@ -259,7 +260,18 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
             height: 48,
             child: ElevatedButton(
               onPressed: p.pendaftaranDibuka
-                  ? () => _segera('Form pendaftaran B3')
+                  ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => B3FormScreen(
+                            periodeLabel: '${p.judul} · Rute Kec. ${p.kecamatan}',
+                            tanggalJemput: formatTanggalHari(p.tglJemput),
+                            desaOptions: p.desa,
+                            beratMin: p.beratMin.toDouble(),
+                            beratMax: p.beratMax.toDouble(),
+                          ),
+                        ),
+                      )
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _hijauTua,
