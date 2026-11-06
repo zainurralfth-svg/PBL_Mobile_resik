@@ -14,7 +14,7 @@ class DaftarWargaDesaScreen extends StatefulWidget {
 class _DaftarWargaDesaScreenState extends State<DaftarWargaDesaScreen> {
   String _selectedFilter = 'Semua';
 
-  final List> _wargaList = [
+final List<Map<String, dynamic>> _wargaList = [
     {
       'nama': 'Zaelani Abdul',
       'alamat': 'Jl. Wilangan Kulon No. 12',
