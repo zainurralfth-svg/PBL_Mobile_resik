@@ -9,6 +9,7 @@ import '../../home/laporan_screen.dart';
 import '../../home/riwayat_penarikan_screen.dart';
 import '../../home/riwayat_setor_screen.dart';
 import 'b3_form_screen.dart';
+import 'b3_riwayat_screen.dart';
 
 // Warna mengikuti desain Sampah B3 (W2 / W3)
 const Color _hijauTua = Color(0xFF2E7D32);
@@ -92,12 +93,19 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
       ),
-      body: RefreshIndicator(
-        color: _hijauTua,
-        onRefresh: _muat,
-        child: _buildBody(),
+      body: Column(
+        children: [
+          const B3TabSwitch(riwayatAktif: false),
+          Expanded(
+            child: RefreshIndicator(
+              color: _hijauTua,
+              onRefresh: _muat,
+              child: _buildBody(),
+            ),
+          ),
+        ],
       ),
-      bottomNavigationBar: _bottomBar(),
+      bottomNavigationBar: const B3BottomBar(),
     );
   }
 
@@ -141,7 +149,14 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
       children: [
         if (periode != null) _kartuPeriode(periode) else _kartuKosong(),
         const SizedBox(height: 20),
-        _judulSeksi('Pendaftaran Saya', 'Lihat Semua', () => _segera('Riwayat B3')),
+        _judulSeksi(
+          'Pendaftaran Saya',
+          'Lihat Semua',
+          () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const B3RiwayatScreen()),
+          ),
+        ),
         const SizedBox(height: 8),
         if (_pendaftaran.isEmpty)
           _kartuPutih(
@@ -515,11 +530,150 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
     );
   }
 
-  // ---------- Bar bawah: bubble B3 / Setor / Penarikan + navigasi ----------
-  // Sama dengan bar bawah di layar Riwayat Setor dan Riwayat Penarikan,
-  // supaya ketiga layar Bank Sampah terasa satu kelompok.
+  // ---------- Komponen umum ----------
 
-  Widget _bottomBar() {
+  Widget _kartuPutih({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _badge(String status) {
+    Color bg;
+    Color fg;
+    switch (status) {
+      case 'Dibuka':
+      case 'Diverifikasi':
+        bg = _hijauBadge;
+        fg = _hijauTua;
+        break;
+      case 'Dijadwalkan':
+        bg = const Color(0xFFD6E4F7);
+        fg = const Color(0xFF2D5BA3);
+        break;
+      case 'Menunggu verifikasi':
+        bg = const Color(0xFFFFF3CD);
+        fg = const Color(0xFF7A5B00);
+        break;
+      case 'Tidak sesuai':
+      case 'Tidak ada di tempat':
+        bg = const Color(0xFFFDECEA);
+        fg = const Color(0xFFB71C1C);
+        break;
+      default:
+        bg = const Color(0xFFEEEEEE);
+        fg = Colors.black54;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// Komponen bersama layar B3 (dipakai layar Daftar dan layar Riwayat)
+// =====================================================================
+
+/// Pilihan "Daftar | Riwayat" di bagian B3. Yang aktif diberi garis bawah.
+/// Berpindah memakai pushReplacement supaya tumpukan layar tidak bertambah.
+class B3TabSwitch extends StatelessWidget {
+  final bool riwayatAktif;
+  final Color warna;
+
+  const B3TabSwitch({
+    super.key,
+    required this.riwayatAktif,
+    this.warna = _hijauTua,
+  });
+
+  void _buka(BuildContext context, Widget layar) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => layar),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: warna,
+      child: Row(
+        children: [
+          _tab(
+            'Daftar',
+            !riwayatAktif,
+            riwayatAktif ? () => _buka(context, const B3InfoScreen()) : null,
+          ),
+          _tab(
+            'Riwayat',
+            riwayatAktif,
+            riwayatAktif ? null : () => _buka(context, const B3RiwayatScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(String label, bool aktif, VoidCallback? onTap) {
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: aktif ? Colors.white : Colors.transparent,
+                width: 3,
+              ),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: aktif ? Colors.white : Colors.white70,
+              fontWeight: aktif ? FontWeight.bold : FontWeight.w500,
+              fontSize: 15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bar bawah Bank Sampah: bubble B3 / Setor / Penarikan + navigasi utama.
+/// Sama dengan bar di layar Riwayat Setor dan Riwayat Penarikan.
+class B3BottomBar extends StatelessWidget {
+  const B3BottomBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
       child: SafeArea(
@@ -565,7 +719,7 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
                 ],
               ),
             ),
-            _nav(),
+            _nav(context),
           ],
         ),
       ),
@@ -627,7 +781,7 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
     );
   }
 
-  Widget _nav() {
+  Widget _nav(BuildContext context) {
     const items = [
       (Icons.home_outlined, Icons.home, 'Home'),
       (Icons.assignment_outlined, Icons.assignment, 'Laporan'),
@@ -702,67 +856,6 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
             ),
           );
         }),
-      ),
-    );
-  }
-
-  // ---------- Komponen umum ----------
-
-  Widget _kartuPutih({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-
-  Widget _badge(String status) {
-    Color bg;
-    Color fg;
-    switch (status) {
-      case 'Dibuka':
-      case 'Diverifikasi':
-        bg = _hijauBadge;
-        fg = _hijauTua;
-        break;
-      case 'Dijadwalkan':
-        bg = const Color(0xFFD6E4F7);
-        fg = const Color(0xFF2D5BA3);
-        break;
-      case 'Menunggu verifikasi':
-        bg = const Color(0xFFFFF3CD);
-        fg = const Color(0xFF7A5B00);
-        break;
-      case 'Tidak sesuai':
-      case 'Tidak ada di tempat':
-        bg = const Color(0xFFFDECEA);
-        fg = const Color(0xFFB71C1C);
-        break;
-      default:
-        bg = const Color(0xFFEEEEEE);
-        fg = Colors.black54;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        status,
-        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }

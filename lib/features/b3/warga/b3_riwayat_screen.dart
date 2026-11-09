@@ -6,12 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../config/api_config.dart';
-import '../../home/home_user_screen.dart';
-import '../../home/info_tps_screen.dart';
-import '../../home/laporan_screen.dart';
-import '../../home/riwayat_penarikan_screen.dart';
-import '../../home/riwayat_setor_screen.dart';
 import 'b3_detail_screen.dart';
+import 'b3_info_screen.dart';
 
 /// Ubah ke false setelah endpoint API B3 siap.
 const bool kB3UseDummyData = true;
@@ -236,16 +232,11 @@ class _B3RiwayatScreenState extends State<B3RiwayatScreen> {
       body: Column(
         children: [
           _buildHeader(context),
+          const B3TabSwitch(riwayatAktif: true, warna: _C.green),
           Expanded(child: _buildBody()),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [_buildSubTabs(context), _buildBottomNav(context)],
-        ),
-      ),
+      bottomNavigationBar: const B3BottomBar(),
     );
   }
 
@@ -547,135 +538,6 @@ class _B3RiwayatScreenState extends State<B3RiwayatScreen> {
           ),
           const SizedBox(height: 4),
           Text(alasan, style: const TextStyle(fontSize: 11, color: _C.text)),
-        ],
-      ),
-    );
-  }
-
-  // ---------- SUB TAB (Riwayat Setor / Penarikan / Riwayat B3) ----------
-  Widget _buildSubTabs(BuildContext context) {
-    return Container(
-      color: _C.green,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Row(
-        children: [
-          _subTab(
-            icon: Icons.inventory_2_outlined,
-            label: 'Riwayat Setor',
-            active: false,
-            onTap: () => Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const RiwayatSetorScreen()),
-            ),
-          ),
-          _subTab(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'Penarikan',
-            active: false,
-            onTap: () => Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const RiwayatPenarikanScreen()),
-            ),
-          ),
-          _subTab(
-            icon: Icons.eco_outlined,
-            label: 'Riwayat B3',
-            active: true,
-            onTap: () {},
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _subTab({
-    required IconData icon,
-    required String label,
-    required bool active,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          height: 34,
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          decoration: BoxDecoration(
-            color: active ? _C.chipIdle : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: active ? _C.greenDark : Colors.white),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: active ? _C.greenDark : Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ---------- BOTTOM NAV ----------
-  Widget _buildBottomNav(BuildContext context) {
-    void goTo(Widget page) => Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => page),
-      (route) => false,
-    );
-
-    return Container(
-      height: 68,
-      color: _C.cream,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.home_outlined, color: _C.green),
-            onPressed: () => goTo(const HomeUserScreen()),
-          ),
-          IconButton(
-            icon: const Icon(Icons.description_outlined, color: _C.green),
-            onPressed: () => goTo(const LaporanScreen()),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-            decoration: BoxDecoration(
-              color: _C.green,
-              borderRadius: BorderRadius.circular(26),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.store_outlined, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text(
-                  'Bank Sampah',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.location_on_outlined, color: _C.green),
-            onPressed: () => goTo(const InfoTpsScreen()),
-          ),
         ],
       ),
     );

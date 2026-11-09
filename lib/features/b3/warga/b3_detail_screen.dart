@@ -9,9 +9,6 @@ import '../../../config/api_config.dart';
 /// Ubah ke false setelah endpoint detail B3 siap.
 const bool kB3DetailUseDummy = true;
 
-/// Status yang ditampilkan oleh data dummy (untuk uji tampilan).
-const B3DetailStatus kB3DetailDummyStatus = B3DetailStatus.tidakSesuai;
-
 class _C {
   static const green = Color(0xFF2D6A1E);
   static const cream = Color(0xFFFFF8E1);
@@ -120,34 +117,7 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
     try {
       if (kB3DetailUseDummy) {
         await Future.delayed(const Duration(milliseconds: 300));
-        _data = kB3DetailDummyStatus == B3DetailStatus.tidakSesuai
-            ? const B3Detail(
-                noPendaftaran: '#B3-00014',
-                jenis: 'Obat Kedaluwarsa',
-                estimasiBerat: '2 kg',
-                beratDijemput: '1.5 kg',
-                alamat: 'Jl. Wilangan Kulon No. 12, Desa Bagor',
-                jadwalJemput: 'Senin, 31 Agu 2026',
-                petugas: 'Budi Santoso',
-                tanggalDaftar: '25 Agu 2026 · 09:12',
-                tanggalDijadwalkan: '28 Agu 2026',
-                tanggalDijemput: '31 Agu 2026',
-                tanggalDiperiksa: '1 Sep 2026',
-                status: B3DetailStatus.tidakSesuai,
-                alasan:
-                    'Terdapat sampah non-B3 (organik) yang tercampur dalam kemasan.',
-              )
-            : const B3Detail(
-                noPendaftaran: '#B3-00021',
-                jenis: 'Baterai, Lampu',
-                estimasiBerat: '4 kg',
-                alamat: 'Jl. Wilangan Kulon No. 12, Desa Bagor',
-                jadwalJemput: 'Kamis, 29 Okt 2026',
-                petugas: 'Budi Santoso',
-                tanggalDaftar: '18 Okt 2026 · 22:05',
-                tanggalDijadwalkan: '26 Okt 2026',
-                status: B3DetailStatus.dijadwalkan,
-              );
+        _data = _dummyDetail(widget.idB3);
       } else {
         final res = await http
             .get(
@@ -166,6 +136,57 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
       _error = '$e';
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  /// Data contoh. ID mengikuti data contoh di Riwayat B3:
+  /// 1 = Dijadwalkan, 2 = Diverifikasi, 3 = Tidak sesuai.
+  B3Detail _dummyDetail(int id) {
+    switch (id) {
+      case 2:
+        return const B3Detail(
+          noPendaftaran: '#B3-00018',
+          jenis: 'Baterai',
+          estimasiBerat: '3 kg',
+          beratDijemput: '3.5 kg',
+          alamat: 'Jl. Wilangan Kulon No. 12, Desa Bagor',
+          jadwalJemput: 'Senin, 28 Sep 2026',
+          petugas: 'Budi Santoso',
+          tanggalDaftar: '14 Sep 2026 · 10:30',
+          tanggalDijadwalkan: '22 Sep 2026',
+          tanggalDijemput: '28 Sep 2026',
+          tanggalDiperiksa: '29 Sep 2026',
+          status: B3DetailStatus.diverifikasi,
+        );
+      case 3:
+        return const B3Detail(
+          noPendaftaran: '#B3-00014',
+          jenis: 'Obat Kedaluwarsa',
+          estimasiBerat: '2 kg',
+          beratDijemput: '1.5 kg',
+          alamat: 'Jl. Wilangan Kulon No. 12, Desa Bagor',
+          jadwalJemput: 'Senin, 31 Agu 2026',
+          petugas: 'Budi Santoso',
+          tanggalDaftar: '25 Agu 2026 · 09:12',
+          tanggalDijadwalkan: '28 Agu 2026',
+          tanggalDijemput: '31 Agu 2026',
+          tanggalDiperiksa: '1 Sep 2026',
+          status: B3DetailStatus.tidakSesuai,
+          alasan:
+              'Terdapat sampah non-B3 (organik) yang tercampur dalam kemasan.',
+        );
+      default:
+        return const B3Detail(
+          noPendaftaran: '#B3-00021',
+          jenis: 'Baterai, Lampu',
+          estimasiBerat: '4 kg',
+          alamat: 'Jl. Wilangan Kulon No. 12, Desa Bagor',
+          jadwalJemput: 'Kamis, 29 Okt 2026',
+          petugas: 'Budi Santoso',
+          tanggalDaftar: '18 Okt 2026 · 22:05',
+          tanggalDijadwalkan: '26 Okt 2026',
+          status: B3DetailStatus.dijadwalkan,
+        );
+    }
   }
 
   @override
