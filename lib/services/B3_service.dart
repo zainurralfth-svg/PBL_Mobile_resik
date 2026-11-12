@@ -7,21 +7,24 @@ import '../models/b3_model.dart';
 
 /// Semua panggilan API B3 untuk warga.
 ///
-/// Selama backend B3 belum jadi, [useDummyData] = true memakai data contoh
-/// supaya tampilan bisa dikerjakan dan dicek dulu.
-/// Kalau backend sudah siap, ubah [useDummyData] menjadi false.
+/// Dua bagian punya saklar sendiri supaya bisa dipakai bertahap:
+/// - [useDummyPeriode]     : periode dari web (sudah ada API-nya)
+/// - [useDummyPendaftaran] : pendaftaran/riwayat warga (API-nya belum dibuat)
 class B3Service {
-  /// true = data contoh (tanpa server). false = panggil API asli.
-  static const bool useDummyData = true;
+  /// false = ambil periode asli yang dibuat admin di web.
+  /// true  = data contoh (tanpa server).
+  static const bool useDummyPeriode = false;
 
-  /// Hanya berlaku saat [useDummyData] = true:
-  /// true  -> contoh "periode dibuka" (desain W2)
-  /// false -> contoh "belum ada periode" (desain W3)
+  /// true = data contoh sampai API pendaftaran B3 selesai.
+  static const bool useDummyPendaftaran = true;
+
+  /// Hanya berlaku saat [useDummyPeriode] = true:
+  /// true -> contoh "periode dibuka" (W2), false -> "belum ada periode" (W3).
   static const bool dummyAdaPeriode = true;
 
-  /// Periode B3 yang sedang berlaku untuk desa warga. null = belum ada periode.
+  /// Periode B3 untuk desa warga. null = belum ada periode.
   static Future<B3Periode?> getPeriodeAktif({String? idDesa}) async {
-    if (useDummyData) {
+    if (useDummyPeriode) {
       await Future.delayed(const Duration(milliseconds: 500));
       if (!dummyAdaPeriode) return null;
       return B3Periode(
@@ -50,19 +53,9 @@ class B3Service {
     required String userId,
     required String tipe,
   }) async {
-    if (useDummyData) {
+    if (useDummyPendaftaran) {
       await Future.delayed(const Duration(milliseconds: 500));
-      if (dummyAdaPeriode) {
-        return [
-          B3Pendaftaran(
-            id: 1,
-            jenisTeks: 'Baterai, Lampu',
-            status: 'Dijadwalkan',
-            estimasiKg: 4,
-            tglJemput: DateTime(2026, 10, 29),
-          ),
-        ];
-      }
+      // Riwayat contoh, tidak bergantung pada ada/tidaknya periode.
       return [
         B3Pendaftaran(
           id: 2,
