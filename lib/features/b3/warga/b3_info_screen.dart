@@ -8,6 +8,7 @@ import '../../home/info_tps_screen.dart';
 import '../../home/laporan_screen.dart';
 import '../../home/riwayat_penarikan_screen.dart';
 import '../../home/riwayat_setor_screen.dart';
+import 'b3_detail_screen.dart';
 import 'b3_form_screen.dart';
 import 'b3_riwayat_screen.dart';
 
@@ -46,8 +47,9 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final user = jsonDecode(prefs.getString('user_data') ?? '{}')
-          as Map<String, dynamic>;
+      final user =
+          jsonDecode(prefs.getString('user_data') ?? '{}')
+              as Map<String, dynamic>;
 
       final idDesa = user['id_desa']?.toString();
       final userId = (user['id_masyarakat'] ?? user['id_pns'] ?? '').toString();
@@ -74,9 +76,9 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
   }
 
   void _segera(String nama) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$nama segera tersedia.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$nama segera tersedia.')));
   }
 
   @override
@@ -178,10 +180,7 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
         ),
         const SizedBox(height: 12),
         _jenisB3(),
-        if (periode != null) ...[
-          const SizedBox(height: 20),
-          _kartuPanduan(),
-        ],
+        if (periode != null) ...[const SizedBox(height: 20), _kartuPanduan()],
       ],
     );
   }
@@ -219,7 +218,10 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
                     ),
                     Text(
                       'Rute Kec. ${p.kecamatan}',
-                      style: const TextStyle(color: Colors.black54, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -234,7 +236,10 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
             children: p.desa
                 .map(
                   (d) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: _hijauChip,
                       borderRadius: BorderRadius.circular(8),
@@ -276,17 +281,18 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
             child: ElevatedButton(
               onPressed: p.pendaftaranDibuka
                   ? () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => B3FormScreen(
-                            periodeLabel: '${p.judul} · Rute Kec. ${p.kecamatan}',
-                            tanggalJemput: formatTanggalHari(p.tglJemput),
-                            desaOptions: p.desa,
-                            beratMin: p.beratMin.toDouble(),
-                            beratMax: p.beratMax.toDouble(),
-                          ),
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => B3FormScreen(
+                          idPeriode: p.id,
+                          periodeLabel: '${p.judul} · Rute Kec. ${p.kecamatan}',
+                          tanggalJemput: formatTanggalHari(p.tglJemput),
+                          desaOptions: p.desa,
+                          beratMin: p.beratMin.toDouble(),
+                          beratMax: p.beratMax.toDouble(),
                         ),
-                      )
+                      ),
+                    )
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _hijauTua,
@@ -297,8 +303,13 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
                 ),
               ),
               child: Text(
-                p.pendaftaranDibuka ? 'Daftar Sekarang' : 'Pendaftaran belum dibuka',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                p.pendaftaranDibuka
+                    ? 'Daftar Sekarang'
+                    : 'Pendaftaran belum dibuka',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
             ),
           ),
@@ -416,7 +427,10 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _segera('Detail pendaftaran B3'),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => B3DetailScreen(idB3: p.id)),
+        ),
         child: _kartuPutih(
           child: Row(
             children: [
@@ -435,7 +449,10 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
                     const SizedBox(height: 2),
                     Text(
                       p.keterangan,
-                      style: const TextStyle(color: Colors.black54, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -686,7 +703,12 @@ class B3BottomBar extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: _bubble('B3', Icons.warning_amber_rounded, true, () {}),
+                    child: _bubble(
+                      'B3',
+                      Icons.warning_amber_rounded,
+                      true,
+                      () {},
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(

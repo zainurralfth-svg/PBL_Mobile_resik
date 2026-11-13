@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import '../../../config/api_config.dart';
 
 /// Ubah ke false setelah endpoint detail B3 siap.
-const bool kB3DetailUseDummy = true;
+const bool kB3DetailUseDummy = false;
 
 class _C {
   static const green = Color(0xFF2D6A1E);
@@ -21,7 +21,13 @@ class _C {
   static const red = Color(0xFFB3261E);
 }
 
-enum B3DetailStatus { dijadwalkan, diverifikasi, tidakSesuai }
+enum B3DetailStatus {
+  terdaftar,
+  dijadwalkan,
+  menungguVerifikasi,
+  diverifikasi,
+  tidakSesuai,
+}
 
 class B3Detail {
   final String noPendaftaran;
@@ -57,13 +63,19 @@ class B3Detail {
   factory B3Detail.fromJson(Map<String, dynamic> j) {
     final jenis = j['jenis'];
     B3DetailStatus st;
-    switch ('${j['status']}'.toLowerCase()) {
+    switch ('${j['status']}'.toLowerCase().trim().replaceAll(' ', '_')) {
       case 'diverifikasi':
         st = B3DetailStatus.diverifikasi;
         break;
       case 'tidak_sesuai':
       case 'ditolak':
         st = B3DetailStatus.tidakSesuai;
+        break;
+      case 'terdaftar':
+        st = B3DetailStatus.terdaftar;
+        break;
+      case 'menunggu_verifikasi':
+        st = B3DetailStatus.menungguVerifikasi;
         break;
       default:
         st = B3DetailStatus.dijadwalkan;
@@ -371,7 +383,8 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          if (d.status == B3DetailStatus.dijadwalkan) ...[
+          if (d.status == B3DetailStatus.terdaftar ||
+              d.status == B3DetailStatus.dijadwalkan) ...[
             _row(Icons.battery_charging_full_outlined, 'Jenis B3', d.jenis),
             _row(Icons.scale_outlined, 'Estimasi berat', d.estimasiBerat),
             _row(Icons.location_on_outlined, 'Alamat jemput', d.alamat),
@@ -486,10 +499,20 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
     late final Color bg;
     late final Color fg;
     switch (s) {
+      case B3DetailStatus.terdaftar:
+        label = 'Terdaftar';
+        bg = const Color(0xFFEDE5B8);
+        fg = const Color(0xFF6B5B00);
+        break;
       case B3DetailStatus.dijadwalkan:
         label = 'Dijadwalkan';
         bg = const Color(0xFFDCE9F8);
         fg = const Color(0xFF1E5AA8);
+        break;
+      case B3DetailStatus.menungguVerifikasi:
+        label = 'Menunggu verifikasi';
+        bg = const Color(0xFFFFE9C7);
+        fg = const Color(0xFF9A5B00);
         break;
       case B3DetailStatus.diverifikasi:
         label = 'Diverifikasi';
@@ -519,7 +542,24 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
   Widget _timelineCard(B3Detail d) {
     final rejected = d.status == B3DetailStatus.tidakSesuai;
     final verified = d.status == B3DetailStatus.diverifikasi;
-    final afterSchedule = rejected || verified;
+
+    // Tahap yang sudah dicapai: 1 terdaftar, 2 dijadwalkan, 3 dijemput/menunggu verifikasi, 4 selesai
+    int level;
+    switch (d.status) {
+      case B3DetailStatus.terdaftar:
+        level = 1;
+        break;
+      case B3DetailStatus.dijadwalkan:
+        level = 2;
+        break;
+      case B3DetailStatus.menungguVerifikasi:
+      case B3DetailStatus.tidakSesuai:
+        level = 3;
+        break;
+      case B3DetailStatus.diverifikasi:
+        level = 4;
+        break;
+    }
 
     final dijemput = d.tanggalDijemput ?? d.jadwalJemput;
     final diperiksa = d.tanggalDiperiksa == null
@@ -530,15 +570,17 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
       _Step('Terdaftar', d.tanggalDaftar, done: true),
       _Step(
         'Dijadwalkan',
-        d.status == B3DetailStatus.dijadwalkan
+        level < 2
+            ? 'Menunggu penugasan petugas'
+            : d.status == B3DetailStatus.dijadwalkan
             ? 'Petugas ditugaskan · ${d.tanggalDijadwalkan}'
             : d.tanggalDijadwalkan,
-        done: true,
+        done: level >= 2,
       ),
       _Step(
         'Menunggu verifikasi',
-        afterSchedule ? 'Dijemput $dijemput' : 'Setelah petugas menjemput',
-        done: afterSchedule,
+        level >= 3 ? 'Dijemput $dijemput' : 'Setelah petugas menjemput',
+        done: level >= 3,
       ),
       if (rejected)
         _Step('Tidak sesuai', diperiksa, done: true, error: true)

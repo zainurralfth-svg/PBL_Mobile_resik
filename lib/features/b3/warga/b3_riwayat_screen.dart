@@ -10,7 +10,7 @@ import 'b3_detail_screen.dart';
 import 'b3_info_screen.dart';
 
 /// Ubah ke false setelah endpoint API B3 siap.
-const bool kB3UseDummyData = true;
+const bool kB3UseDummyData = false;
 
 // ==================== PALET WARNA ====================
 class _C {
@@ -24,7 +24,13 @@ class _C {
 }
 
 // ==================== MODEL ====================
-enum B3Status { dijadwalkan, diverifikasi, tidakSesuai }
+enum B3Status {
+  terdaftar,
+  dijadwalkan,
+  menungguVerifikasi,
+  diverifikasi,
+  tidakSesuai,
+}
 
 class B3RiwayatItem {
   final int id;
@@ -54,15 +60,19 @@ class B3RiwayatItem {
   }
 
   static B3Status _toStatus(String? s) {
-    switch ((s ?? '').toLowerCase()) {
+    switch ((s ?? '').toLowerCase().trim().replaceAll(' ', '_')) {
       case 'diverifikasi':
         return B3Status.diverifikasi;
       case 'tidak_sesuai':
       case 'tidak sesuai':
       case 'ditolak':
         return B3Status.tidakSesuai;
+      case 'terdaftar':
+        return B3Status.terdaftar;
+      case 'menunggu_verifikasi':
+        return B3Status.menungguVerifikasi;
       default:
-        return B3Status.dijadwalkan; // dijadwalkan / diproses / menunggu
+        return B3Status.dijadwalkan;
     }
   }
 
@@ -145,11 +155,14 @@ class _B3RiwayatScreenState extends State<B3RiwayatScreen> {
           throw 'Silakan login ulang';
         }
         final user = jsonDecode(userDataStr);
-        final idMasyarakat = user['id_masyarakat'];
+        // Sama dengan B3Service.getPendaftaranSaya: user_id + tipe
+        final userId = (user['id_masyarakat'] ?? user['id_pns'] ?? '')
+            .toString();
+        final tipe = (user['tipe'] ?? '').toString();
 
         final uri = Uri.parse(
           '${ApiConfig.baseUrl}/b3/riwayat',
-        ).replace(queryParameters: {'id_masyarakat': '$idMasyarakat'});
+        ).replace(queryParameters: {'user_id': userId, 'tipe': tipe});
 
         final res = await http
             .get(uri, headers: ApiConfig.headers)
@@ -202,7 +215,13 @@ class _B3RiwayatScreenState extends State<B3RiwayatScreen> {
   ];
 
   List<B3RiwayatItem> get _filtered => _onlyProcessing
-      ? _items.where((e) => e.status == B3Status.dijadwalkan).toList()
+      ? _items
+            .where(
+              (e) =>
+                  e.status != B3Status.diverifikasi &&
+                  e.status != B3Status.tidakSesuai,
+            )
+            .toList()
       : _items;
 
   // Kelompokkan per tanggal (urutan sudah desc)
@@ -476,10 +495,20 @@ class _B3RiwayatScreenState extends State<B3RiwayatScreen> {
     late final Color fg;
 
     switch (s) {
+      case B3Status.terdaftar:
+        label = 'Terdaftar';
+        bg = const Color(0xFFEDE5B8);
+        fg = const Color(0xFF6B5B00);
+        break;
       case B3Status.dijadwalkan:
         label = 'Dijadwalkan';
         bg = const Color(0xFFDCE9F8);
         fg = const Color(0xFF1E5AA8);
+        break;
+      case B3Status.menungguVerifikasi:
+        label = 'Menunggu verifikasi';
+        bg = const Color(0xFFFFE9C7);
+        fg = const Color(0xFF9A5B00);
         break;
       case B3Status.diverifikasi:
         label = 'Diverifikasi';

@@ -11,6 +11,7 @@ import 'b3_konfirmasi_screen.dart';
 
 /// Data isian form. Dioper ke W5 supaya ringkasannya sama dengan isian.
 class B3FormData {
+  final int idPeriode;
   final String periodeLabel;
   final String tanggalJemput;
   final List<String> jenis;
@@ -20,6 +21,7 @@ class B3FormData {
   final String keterangan;
 
   const B3FormData({
+    this.idPeriode = 0,
     this.periodeLabel = 'Oktober 2026 · Rute Kec. Bogor',
     this.tanggalJemput = 'Kamis, 29 Okt 2026',
     this.jenis = const ['Baterai', 'Lampu'],
@@ -34,6 +36,7 @@ class B3FormData {
 }
 
 class B3FormScreen extends StatefulWidget {
+  final int idPeriode;
   final String periodeLabel;
   final String tanggalJemput;
 
@@ -47,6 +50,7 @@ class B3FormScreen extends StatefulWidget {
 
   const B3FormScreen({
     super.key,
+    this.idPeriode = 0,
     this.periodeLabel = 'Periode Oktober 2026 · Rute Kec. Bogor',
     this.tanggalJemput = 'Kamis, 29 Okt 2026',
     this.desaOptions,
@@ -129,6 +133,7 @@ class _B3FormScreenState extends State<B3FormScreen> {
     if (_selectedJenis.isEmpty || !_formKey.currentState!.validate()) return;
 
     final data = B3FormData(
+      idPeriode: widget.idPeriode,
       periodeLabel: widget.periodeLabel.replaceFirst(
         RegExp(r'^Periode\s+'),
         '',
