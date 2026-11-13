@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'b3_ditandai_dijemput_screen.dart';
 
 class B3DetailJemputScreen extends StatelessWidget {
   // Data opsional jika nanti ingin dinamis passing data dari halaman sebelumnya
@@ -206,8 +207,33 @@ class B3DetailJemputScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Nanti diarahkan ke b3_ditandai_dijemput_screen.dart
+                      onPressed: () async {
+                        // Ambil angka dari teks estimasi, mis. '4 kg' -> 4.0
+                        final estimasi = double.tryParse(
+                              RegExp(r'[0-9]+([.,][0-9]+)?')
+                                      .firstMatch('${dataWarga?['estimasi'] ?? '4'}')
+                                      ?.group(0)
+                                      ?.replaceAll(',', '.') ??
+                                  '',
+                            ) ??
+                            4;
+
+                        final hasil = await Navigator.push<double>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => B3DitandaiDijemputScreen(
+                              nama: dataWarga?['nama'] ?? 'Zaelani Abdul',
+                              alamat: dataWarga?['alamat'] ?? 'Jl. Wilangan Kulon No. 12, Desa Bagor',
+                              jenis: dataWarga?['kategori'] ?? 'Baterai, Lampu',
+                              estimasiKg: estimasi,
+                            ),
+                          ),
+                        );
+
+                        // Sudah disimpan -> kembali ke daftar warga.
+                        if (hasil != null && context.mounted) {
+                          Navigator.pop(context, hasil);
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1B5E20), // Hijau Gelap

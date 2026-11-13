@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:resik/features/b3/petugas/b3_ringkasan_screen.dart';
 import 'b3_detail_jemput_screen.dart'; // Import halaman detail yang baru dibuat
 
 class DaftarWargaDesaScreen extends StatefulWidget {
