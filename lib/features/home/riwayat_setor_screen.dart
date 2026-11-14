@@ -8,6 +8,7 @@ import 'laporan_screen.dart';
 import 'riwayat_penarikan_screen.dart';
 import 'info_tps_screen.dart';
 import 'dart:async';
+import '../b3/warga/b3_info_screen.dart';
 
 class RiwayatSetorScreen extends StatefulWidget {
   final int? highlightId;
@@ -294,7 +295,7 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen>
             ),
           ),
 
-          // ============ BUBBLE TABS ============
+                    // ============ BUBBLE TABS ============
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -302,16 +303,28 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen>
               children: [
                 Expanded(
                   child: _buildBubble(
-                    'Riwayat Setor',
+                    'B3',
+                    Icons.warning_amber_rounded,
+                    false,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const B3InfoScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildBubble(
+                    'Setor',
                     Icons.upload_rounded,
                     true,
                     () {},
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _buildBubble(
-                    'Riwayat Penarikan',
+                    'Penarikan',
                     Icons.download_rounded,
                     false,
                     () => Navigator.push(
@@ -325,7 +338,7 @@ class _RiwayatSetorScreenState extends State<RiwayatSetorScreen>
               ],
             ),
           ),
-
+          
           // ============ BOTTOM NAV ============
           _buildConsistentBottomNav(context),
         ],

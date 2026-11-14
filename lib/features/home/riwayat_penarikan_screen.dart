@@ -9,6 +9,7 @@ import 'home_user_screen.dart';
 import 'laporan_screen.dart';
 import 'info_tps_screen.dart';
 import 'package:intl/intl.dart';
+import '../b3/warga/b3_info_screen.dart';
 
 class RiwayatPenarikanScreen extends StatefulWidget {
   const RiwayatPenarikanScreen({super.key});
@@ -275,7 +276,7 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen>
             ),
           ),
 
-          // ============ BUBBLE TABS ============
+                   // ============ BUBBLE TABS ============
           Container(
             color: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -283,7 +284,19 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen>
               children: [
                 Expanded(
                   child: _buildBubble(
-                    'Riwayat Setor',
+                    'B3',
+                    Icons.warning_amber_rounded,
+                    false,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const B3InfoScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildBubble(
+                    'Setor',
                     Icons.upload_rounded,
                     false,
                     () => Navigator.push(
@@ -294,10 +307,10 @@ class _RiwayatPenarikanScreenState extends State<RiwayatPenarikanScreen>
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _buildBubble(
-                    'Riwayat Penarikan',
+                    'Penarikan',
                     Icons.download_rounded,
                     true,
                     () {},

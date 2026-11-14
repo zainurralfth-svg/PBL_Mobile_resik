@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:resik/features/b3/warga/b3_info_screen.dart';
+import '../../models/b3_model.dart';
+import '../../services/b3_service.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +19,7 @@ import 'riwayat_penarikan_screen.dart';
 import 'info_tps_screen.dart';
 import 'package:intl/intl.dart';
 import '../notification/notification_list_screen.dart';
+import 'package:resik/features/home/home_user_screen.dart';
 
 // ✅ TAMBAHKAN IMPORT INI:
 import '../shared/jenis_sampah_list_screen.dart';
@@ -53,10 +57,30 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
   List<dynamic> _artikelList = [];
   bool _isLoadingArtikel = true;
 
+  // Periode B3 untuk desa warga (dari web). Banner hanya tampil saat status 'Dibuka'.
+  B3Periode? _periodeB3;
+
   Future<void> _handleRefresh() async {
     await _fetchSaldo();
     await _fetchArtikel();
     await _fetchUnreadCount();
+    await _fetchPeriodeB3();
+  }
+
+  Future<void> _fetchPeriodeB3() async {
+    final idDesa = _userData?['id_desa']?.toString();
+    if (idDesa == null || idDesa.isEmpty) {
+      if (mounted) setState(() => _periodeB3 = null);
+      return;
+    }
+    try {
+      final periode = await B3Service.getPeriodeAktif(idDesa: idDesa);
+      if (mounted) setState(() => _periodeB3 = periode);
+    } catch (e) {
+      // Gagal ambil periode -> sembunyikan banner, jangan ganggu halaman Home.
+      debugPrint('Error fetch periode B3: $e');
+      if (mounted) setState(() => _periodeB3 = null);
+    }
   }
 
   @override
@@ -121,6 +145,8 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
       targetScreen = const RiwayatSetorScreen();
     } else if (page == 'penarikan') {
       targetScreen = const RiwayatPenarikanScreen();
+    } else if (page == 'b3') {
+      targetScreen = const B3InfoScreen();
     } else {
       return;
     }
@@ -137,6 +163,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
       _fetchSaldo();
       _fetchArtikel();
       _fetchUnreadCount();
+      _fetchPeriodeB3();
     }
   }
 
@@ -384,7 +411,20 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
       children: [
         Expanded(
           child: _buildBubble(
-            'Riwayat Setor',
+            'B3',
+            Icons.warning_amber_rounded,
+            _activeBankBubble == 'b3',
+            () {
+              setState(() => _activeBankBubble = 'b3');
+              debugPrint('B3 ditekan');
+              _navigateToPage('b3');
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildBubble(
+            'Setor',
             Icons.upload_rounded,
             _activeBankBubble == 'setor',
             () {
@@ -393,10 +433,10 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
             },
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: _buildBubble(
-            'Riwayat Penarikan',
+            'Penarikan',
             Icons.download_rounded,
             _activeBankBubble == 'penarikan',
             () {
@@ -685,7 +725,15 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
   }
 
 // ✅ WIDGET KHUSUS BANNER B3
+  // Tampil hanya kalau admin sudah membuat periode untuk desa warga dan
+  // statusnya 'Dibuka'. Saat belum dibuka atau sudah ditutup, banner hilang.
   Widget _buildB3Banner() {
+    final periode = _periodeB3;
+    if (periode == null || periode.status != 'Dibuka') {
+      return const SizedBox.shrink();
+    }
+    final sampai = DateFormat('d MMM yyyy').format(periode.tglTutup);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -705,11 +753,11 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
             child: const Icon(Icons.eco, color: Color(0xFF4CAF50), size: 24),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Pendaftaran B3 dibuka',
                   style: TextStyle(
                     color: Color(0xFF1B5E20),
@@ -718,8 +766,8 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                   ),
                 ),
                 Text(
-                  'Cek ketersediaan periode bulan ini',
-                  style: TextStyle(
+                  'Daftar sebelum $sampai',
+                  style: const TextStyle(
                     color: Colors.grey,
                     fontSize: 11,
                   ),
@@ -728,10 +776,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              // TODO: Arahkan ke halaman B3 Main Screen (yang berisi detail rute/empty state)
-              // Navigator.push(context, MaterialPageRoute(builder: (_) => const B3MainScreen()));
-            },
+            onPressed: () => _navigateToPage('b3'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF4CAF50),
               shape: RoundedRectangleBorder(
@@ -828,7 +873,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
               ),
 // ✅ TAMBAHKAN BANNER B3 DI SINI
               _buildB3Banner(),
-              const SizedBox(height: 24),
+              if (_periodeB3?.status == 'Dibuka') const SizedBox(height: 24),
 
               // ✅ ARTIKEL EDUKASI
               _buildSectionTitle(

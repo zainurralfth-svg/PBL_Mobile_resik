@@ -10,6 +10,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import '../../config/api_config.dart';
 import 'home_admin_screen.dart';
+import 'package:resik/features/b3/petugas/b3_ringkasan_screen.dart'; // Import halaman ringkasan muatan
 
 class PenjemputanScreen extends StatefulWidget {
   final String? initialTab;
@@ -797,6 +798,33 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
               _buildDesaB3Item('Desa Balongrejo', '0 / 2 warga dijemput • est. 18 kg'),
               _buildDesaB3Item('Desa Kedungsumber', '0 / 1 warga dijemput • est. 12 kg'),
               _buildDesaB3Item('Desa Banaran', '0 / 1 warga dijemput • est. 8 kg'),
+                      const SizedBox(height: 16),
+        // Tombol Ringkasan Muatan (desain P2) -> halaman P6
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const B3RingkasanScreen()),
+              );
+            },
+            icon: const Icon(Icons.inventory_2_outlined, size: 18),
+            label: const Text(
+              'Ringkasan Muatan',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF2E7D32),
+              side: const BorderSide(color: Color(0xFF2E7D32)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
             ],
           ),
         ),
