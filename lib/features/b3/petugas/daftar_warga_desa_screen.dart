@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'b3_detail_jemput_screen.dart'; // Import halaman detail yang baru dibuat
+import 'package:http/http.dart' as http;
+import 'b3_detail_jemput_screen.dart';
 
 class DaftarWargaDesaScreen extends StatefulWidget {
   final String namaDesa;
@@ -14,51 +16,44 @@ class DaftarWargaDesaScreen extends StatefulWidget {
 
 class _DaftarWargaDesaScreenState extends State<DaftarWargaDesaScreen> {
   String _selectedFilter = 'Semua';
+  List<dynamic> _wargaList = [];
+  bool _isLoading = true;
 
-final List<Map<String, dynamic>> _wargaList = [
-    {
-      'nama': 'Zaelani Abdul',
-      'alamat': 'Jl. Wilangan Kulon No. 12',
-      'kategori': 'Baterai, Lampu',
-      'status': 'Dijadwalkan',
-      'status_key': 'belum',
-      'estimasi': '4 kg',
-    },
-    {
-      'nama': 'Farida Novalia',
-      'alamat': 'Jl. Kenanga No. 3',
-      'kategori': 'Elektronik',
-      'status': 'Dijadwalkan',
-      'status_key': 'belum',
-      'estimasi': '8 kg',
-    },
-    {
-      'nama': 'Sitka Lucky',
-      'alamat': 'Jl. Melati No. 7',
-      'kategori': 'Obat Kadaluwarsa',
-      'status': 'Menunggu verifikasi',
-      'status_key': 'dijemput',
-      'estimasi': '3 kg',
-    },
-    {
-      'nama': 'Hendra Wijaya',
-      'alamat': 'Jl. Anggrek No. 21',
-      'kategori': 'Aerosol / Cat',
-      'status': 'Tidak ada di tempat',
-      'status_key': 'tidak_ada',
-      'estimasi': '9 kg',
-    },
-  ];
+  final String baseUrl = "http://10.0.2.2:8000/api";
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchWargaFromDatabase();
+  }
+
+  Future<void> _fetchWargaFromDatabase() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/petugas/b3-tasks'));
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        setState(() {
+          _wargaList = decoded['data'];
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      print("Error fetching data: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final filteredList = _selectedFilter == 'Semua'
         ? _wargaList
         : _wargaList.where((item) {
-            if (_selectedFilter == 'Belum') return item['status_key'] == 'belum';
-            if (_selectedFilter == 'Dijemput') return item['status_key'] == 'dijemput';
-            if (_selectedFilter == 'Tidak ada') return item['status_key'] == 'tidak_ada';
-            return true;
+            String status = item['status'] ?? '';
+            if (_selectedFilter == 'Belum' && status == 'pending') return true;
+            if (_selectedFilter == 'Dijemput' && status == 'selesai') return true;
+            return false;
           }).toList();
 
     return Scaffold(
@@ -92,21 +87,28 @@ final List<Map<String, dynamic>> _wargaList = [
                   _buildFilterChip('Belum'),
                   const SizedBox(width: 8),
                   _buildFilterChip('Dijemput'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Tidak ada'),
                 ],
               ),
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: filteredList.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                return _buildWargaCard(filteredList[index]);
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1B5E20)))
+                : _wargaList.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Belum ada data penjemputan di database.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: filteredList.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          return _buildWargaCard(filteredList[index]);
+                        },
+                      ),
           ),
         ],
       ),
@@ -116,11 +118,7 @@ final List<Map<String, dynamic>> _wargaList = [
   Widget _buildFilterChip(String label) {
     final isSelected = _selectedFilter == label;
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedFilter = label;
-        });
-      },
+      onTap: () => setState(() => _selectedFilter = label),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
@@ -140,36 +138,28 @@ final List<Map<String, dynamic>> _wargaList = [
   }
 
   Widget _buildWargaCard(Map<String, dynamic> item) {
-    Color statusBgColor;
-    Color statusTextColor;
+    String statusDb = item['status'] ?? 'pending';
+    String statusText = statusDb == 'selesai' ? 'Selesai Dijemput' : 'Dijadwalkan';
+    Color statusBgColor = statusDb == 'selesai' ? const Color(0xFFE8F5E9) : const Color(0xFFD3E3FD);
+    Color statusTextColor = statusDb == 'selesai' ? const Color(0xFF2E7D32) : const Color(0xFF045DBF);
 
-    switch (item['status']) {
-      case 'Dijadwalkan':
-        statusBgColor = const Color(0xFFD3E3FD);
-        statusTextColor = const Color(0xFF045DBF);
-        break;
-      case 'Menunggu verifikasi':
-        statusBgColor = const Color(0xFFFFE082);
-        statusTextColor = const Color(0xFF7F6000);
-        break;
-      case 'Tidak ada di tempat':
-        statusBgColor = const Color(0xFFFFCDD2);
-        statusTextColor = const Color(0xFFC62828);
-        break;
-      default:
-        statusBgColor = const Color(0xFFE8F5E9);
-        statusTextColor = const Color(0xFF2E7D32);
+    String jenisB3 = 'Limbah B3';
+    if (item['items'] != null && (item['items'] as List).isNotEmpty) {
+      jenisB3 = item['items'].map((i) => i['jenis_b3']).join(', ');
     }
 
-    // MEMBUNGKUS CARD DENGAN GESTUREDETECTOR UNTUK NAVIGASI
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => B3DetailJemputScreen(dataWarga: item),
           ),
         );
+
+        if (result != null && mounted) {
+          _fetchWargaFromDatabase();
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -195,7 +185,7 @@ final List<Map<String, dynamic>> _wargaList = [
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item['nama'],
+                        item['masyarakat']?['name'] ?? 'Warga RESIK',
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -203,12 +193,9 @@ final List<Map<String, dynamic>> _wargaList = [
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        item['alamat'],
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                        ),
+                      const Text(
+                        'Alamat terdaftar di sistem',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ],
                   ),
@@ -220,7 +207,7 @@ final List<Map<String, dynamic>> _wargaList = [
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    item['status'],
+                    statusText,
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -241,7 +228,7 @@ final List<Map<String, dynamic>> _wargaList = [
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    item['kategori'],
+                    jenisB3,
                     style: const TextStyle(
                       fontSize: 11,
                       color: Color(0xFF333333),
@@ -252,7 +239,7 @@ final List<Map<String, dynamic>> _wargaList = [
                 Row(
                   children: [
                     Text(
-                      'Est. ${item['estimasi']}',
+                      'Est. ${item['est_berat'] ?? 0} kg',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -260,11 +247,7 @@ final List<Map<String, dynamic>> _wargaList = [
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
+                    const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
                   ],
                 ),
               ],
