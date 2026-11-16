@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import 'b3_form_screen.dart' show B3FormData;
+import 'b3_riwayat_screen.dart';
 
 class B3TerkirimScreen extends StatelessWidget {
   /// Kalau tidak diisi, dipakai data contoh (bisa dibuka sendiri).
@@ -191,7 +192,11 @@ class B3TerkirimScreen extends StatelessWidget {
             height: 52,
             child: ElevatedButton(
               onPressed: () {
-                // TODO: arahkan ke Riwayat B3 (W7) nanti.
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const B3RiwayatScreen()),
+                  (route) => route.isFirst,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _green,

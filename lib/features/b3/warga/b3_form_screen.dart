@@ -6,8 +6,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'b3_konfirmasi_screen.dart';
+import 'b3_riwayat_screen.dart';
 
 /// Data isian form. Dioper ke W5 supaya ringkasannya sama dengan isian.
 class B3FormData {
