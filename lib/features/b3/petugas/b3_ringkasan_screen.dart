@@ -1,7 +1,13 @@
 // lib/features/b3/petugas/b3_ringkasan_screen.dart
-// P6 · Ringkasan Muatan (petugas) — TAMPILAN SAJA.
-// Angka di bawah masih contoh; sambungkan ke API setelah backend petugas jadi.
+// P6 · Ringkasan Muatan (petugas) — tersambung ke API:
+//   GET  /api/petugas/b3-muatan?id_petugas=..      (ringkasan & muatan per jenis)
+//   POST /api/petugas/b3-rute/selesai              (tombol "Selesaikan Rute")
+// Muatan per jenis dihitung dalam jumlah item (pcs): berat tersimpan per warga, bukan per jenis.
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../../config/api_config.dart';
+import 'petugas_session.dart';
 
 class _C {
   static const green = Color(0xFF2D6A1E);
@@ -18,32 +24,129 @@ class _C {
 }
 
 class _Muatan {
-  final IconData ikon;
   final String jenis;
   final int warga;
-  final double kg;
-  const _Muatan(this.ikon, this.jenis, this.warga, this.kg);
+  final int jumlah;
+  const _Muatan(this.jenis, this.warga, this.jumlah);
+
+  IconData get ikon {
+    final j = jenis.toLowerCase();
+    if (j.contains('baterai') || j.contains('aki')) return Icons.battery_full;
+    if (j.contains('lampu')) return Icons.lightbulb_outline;
+    if (j.contains('elektronik')) return Icons.memory;
+    if (j.contains('obat')) return Icons.medication_outlined;
+    if (j.contains('cat')) return Icons.format_paint_outlined;
+    return Icons.inventory_2_outlined;
+  }
 }
 
-class B3RingkasanScreen extends StatelessWidget {
+class B3RingkasanScreen extends StatefulWidget {
+  /// Nilai awal sebelum data dari server tiba (opsional).
   final int dijemput;
   final int totalWarga;
 
   const B3RingkasanScreen({
     super.key,
-    this.dijemput = 3,
-    this.totalWarga = 8,
+    this.dijemput = 0,
+    this.totalWarga = 0,
   });
 
-  // Contoh data. Nanti diganti hasil API (dikelompokkan per jenis).
-  static const List<_Muatan> _muatan = [
-    _Muatan(Icons.battery_full, 'Baterai', 2, 5.0),
-    _Muatan(Icons.lightbulb_outline, 'Lampu', 1, 3.5),
-    _Muatan(Icons.memory, 'Elektronik', 1, 2.0),
-    _Muatan(Icons.medication_outlined, 'Obat Kedaluwarsa', 1, 1.0),
-  ];
+  @override
+  State<B3RingkasanScreen> createState() => _B3RingkasanScreenState();
+}
 
-  double get _totalKg => _muatan.fold(0.0, (a, m) => a + m.kg);
+class _B3RingkasanScreenState extends State<B3RingkasanScreen> {
+  bool _loading = true;
+  bool _menyelesaikan = false;
+  String? _error;
+  late int _dijemput = widget.dijemput;
+  late int _totalWarga = widget.totalWarga;
+  double _beratAktual = 0;
+  List<_Muatan> _muatan = [];
+
+  int get _totalItem => _muatan.fold(0, (a, m) => a + m.jumlah);
+
+  @override
+  void initState() {
+    super.initState();
+    _muat();
+  }
+
+  void _snack(String pesan) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pesan)));
+  }
+
+  Future<void> _muat() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final idPetugas = await PetugasSession.getId();
+      if (idPetugas == null) {
+        throw 'Sesi petugas tidak ditemukan. Silakan login ulang.';
+      }
+      final res = await http
+          .get(Uri.parse('${ApiConfig.petugasB3Muatan}?id_petugas=$idPetugas'), headers: ApiConfig.headers)
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode != 200) {
+        throw 'Gagal memuat ringkasan (${res.statusCode}).';
+      }
+      final data = json.decode(res.body)['data'];
+      final list = (data['muatan'] as List? ?? [])
+          .map((m) => _Muatan(
+                (m['jenis'] ?? '-').toString(),
+                int.tryParse(m['warga'].toString()) ?? 0,
+                int.tryParse(m['jumlah'].toString()) ?? 0,
+              ))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _dijemput = int.tryParse(data['dijemput'].toString()) ?? 0;
+        _totalWarga = int.tryParse(data['total_warga'].toString()) ?? 0;
+        _beratAktual = double.tryParse(data['berat_aktual'].toString()) ?? 0;
+        _muatan = list;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error muat ringkasan: $e');
+      if (!mounted) return;
+      setState(() {
+        _error = e is String ? e : 'Tidak dapat terhubung ke server.';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _selesaikanRute() async {
+    final idPetugas = await PetugasSession.getId();
+    if (idPetugas == null) {
+      _snack('Sesi petugas tidak ditemukan. Silakan login ulang.');
+      return;
+    }
+    setState(() => _menyelesaikan = true);
+    try {
+      final res = await http
+          .post(
+            Uri.parse(ApiConfig.petugasB3RuteSelesai),
+            headers: ApiConfig.headers,
+            body: json.encode({'id_petugas': idPetugas}),
+          )
+          .timeout(const Duration(seconds: 15));
+      var msg = res.statusCode == 200 ? 'Rute berhasil diselesaikan.' : 'Gagal menyelesaikan rute (${res.statusCode}).';
+      try {
+        msg = (json.decode(res.body)['message'] ?? msg).toString();
+      } catch (_) {}
+      _snack(msg);
+      if (res.statusCode == 200) await _muat();
+    } catch (e) {
+      debugPrint('Error selesaikan rute: $e');
+      _snack('Tidak dapat terhubung ke server.');
+    } finally {
+      if (mounted) setState(() => _menyelesaikan = false);
+    }
+  }
 
   String _kg(double v) => v.toStringAsFixed(1);
 
@@ -64,46 +167,57 @@ class B3RingkasanScreen extends StatelessWidget {
       body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _statKartu(
-                          '$dijemput / $totalWarga',
-                          'Warga dijemput',
-                          _C.olive,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: _C.green))
+                : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: _C.muted)),
+                              const SizedBox(height: 12),
+                              OutlinedButton(onPressed: _muat, child: const Text('Coba lagi')),
+                            ],
+                          ),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        color: _C.green,
+                        onRefresh: _muat,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(child: _statKartu('$_dijemput / $_totalWarga', 'Warga dijemput', _C.olive)),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: _statKartu('${_kg(_beratAktual)} kg', 'Berat aktual', _C.biru)),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Muatan per Jenis',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _C.green),
+                                  ),
+                                  Text('Total $_totalItem item', style: const TextStyle(fontSize: 11, color: _C.muted)),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              _daftarMuatan(),
+                              const SizedBox(height: 14),
+                              _catatan(),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _statKartu(
-                          '${_kg(_totalKg)} kg',
-                          'Berat aktual',
-                          _C.biru,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Muatan per Jenis',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: _C.green,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  _daftarMuatan(),
-                  const SizedBox(height: 14),
-                  _catatan(),
-                ],
-              ),
-            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -111,24 +225,20 @@ class B3RingkasanScreen extends StatelessWidget {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {
-                  // TODO: kirim "selesaikan rute" ke API petugas.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Rute selesai (contoh).')),
-                  );
-                },
+                onPressed: (_loading || _menyelesaikan) ? null : _selesaikanRute,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _C.green,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),
-                child: const Text(
-                  'Selesaikan Rute',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                ),
+                child: _menyelesaikan
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      )
+                    : const Text('Selesaikan Rute', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               ),
             ),
           ),
@@ -141,31 +251,34 @@ class B3RingkasanScreen extends StatelessWidget {
   Widget _statKartu(String nilai, String label, Color warna) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: warna,
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: BoxDecoration(color: warna, borderRadius: BorderRadius.circular(14)),
       child: Column(
         children: [
-          Text(
-            nilai,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: _C.green,
-            ),
-          ),
+          Text(nilai, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _C.green)),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: _C.muted),
-          ),
+          Text(label, style: const TextStyle(fontSize: 11, color: _C.muted)),
         ],
       ),
     );
   }
 
   Widget _daftarMuatan() {
+    if (_muatan.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _C.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _C.divider),
+        ),
+        child: const Text(
+          'Belum ada barang yang dijemput.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: _C.muted),
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
@@ -177,8 +290,7 @@ class B3RingkasanScreen extends StatelessWidget {
         children: [
           for (int i = 0; i < _muatan.length; i++) ...[
             _barisMuatan(_muatan[i]),
-            if (i < _muatan.length - 1)
-              const Divider(height: 1, color: _C.divider),
+            if (i < _muatan.length - 1) const Divider(height: 1, color: _C.divider),
           ],
         ],
       ),
@@ -193,10 +305,7 @@ class B3RingkasanScreen extends StatelessWidget {
           Container(
             width: 30,
             height: 30,
-            decoration: BoxDecoration(
-              color: _C.iconBg,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: _C.iconBg, borderRadius: BorderRadius.circular(8)),
             child: Icon(m.ikon, size: 17, color: _C.green),
           ),
           const SizedBox(width: 12),
@@ -204,29 +313,12 @@ class B3RingkasanScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  m.jenis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: _C.green,
-                  ),
-                ),
-                Text(
-                  '${m.warga} warga',
-                  style: const TextStyle(fontSize: 10.5, color: _C.muted),
-                ),
+                Text(m.jenis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _C.green)),
+                Text('${m.warga} warga', style: const TextStyle(fontSize: 10.5, color: _C.muted)),
               ],
             ),
           ),
-          Text(
-            '${_kg(m.kg)} kg',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: _C.green,
-            ),
-          ),
+          Text('${m.jumlah} item', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _C.green)),
         ],
       ),
     );
@@ -235,10 +327,7 @@ class B3RingkasanScreen extends StatelessWidget {
   Widget _catatan() {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _C.note,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: _C.note, borderRadius: BorderRadius.circular(12)),
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

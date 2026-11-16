@@ -1,13 +1,17 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../config/api_config.dart';
 import 'b3_detail_jemput_screen.dart';
+import 'petugas_session.dart';
 
 class DaftarWargaDesaScreen extends StatefulWidget {
   final String namaDesa;
+  final int? idDesa;
   const DaftarWargaDesaScreen({
     super.key,
     this.namaDesa = 'Desa Bagor',
+    this.idDesa,
   });
 
   @override
@@ -19,7 +23,7 @@ class _DaftarWargaDesaScreenState extends State<DaftarWargaDesaScreen> {
   List<dynamic> _wargaList = [];
   bool _isLoading = true;
 
-  final String baseUrl = "http://10.0.2.2:8000/api";
+  String get baseUrl => ApiConfig.baseUrl;
 
   @override
   void initState() {
@@ -29,7 +33,10 @@ class _DaftarWargaDesaScreenState extends State<DaftarWargaDesaScreen> {
 
   Future<void> _fetchWargaFromDatabase() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/petugas/b3-tasks'));
+      final idPetugas = await PetugasSession.getId();
+      var url = '$baseUrl/petugas/b3-tasks?id_petugas=$idPetugas';
+      if (widget.idDesa != null) url += '&id_desa=${widget.idDesa}';
+      final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         setState(() {
@@ -193,9 +200,11 @@ class _DaftarWargaDesaScreenState extends State<DaftarWargaDesaScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      const Text(
-                        'Alamat terdaftar di sistem',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      Text(
+                        item['alamat']?.toString() ?? 'Alamat terdaftar di sistem',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:resik/features/admin/penjemputan_screen.dart';
+import 'package:resik/features/b3/petugas/petugas_session.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -97,19 +98,32 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   // Ambil Data Ringkasan B3 Langsung dari Database via API
   Future<void> _fetchB3Summary() async {
     try {
+      // Endpoint petugas wajib menerima id_petugas; tanpa itu server membalas 422.
+      final idPetugas = await PetugasSession.getId();
+      if (idPetugas == null) {
+        if (mounted) setState(() => _isLoadingB3 = false);
+        return;
+      }
       final response = await http
-          .get(Uri.parse('${ApiConfig.baseUrl}/petugas/b3-ringkasan'))
-          .timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200 && mounted) {
+          .get(
+            Uri.parse('${ApiConfig.petugasB3Ringkasan}?id_petugas=$idPetugas'),
+            headers: ApiConfig.headers,
+          )
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         if (result['success'] == true) {
           setState(() {
-            _b3Summary = result['data'] ?? {};
+            _b3Summary = Map<String, dynamic>.from(result['data'] ?? {});
             _isLoadingB3 = false;
           });
+          return;
         }
       }
+      setState(() => _isLoadingB3 = false);
     } catch (e) {
+      debugPrint('Error ringkasan B3: $e');
       if (mounted) setState(() => _isLoadingB3 = false);
     }
   }
@@ -890,10 +904,11 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
 
   // BANNER B3 ADMIN DINAMIS (TERHUBUNG KE DATABASE)
   Widget _buildB3AdminBanner() {
-    int totalWarga = _b3Summary['total_warga'] ?? 0;
-    int dijemput = _b3Summary['dijemput'] ?? 0;
+    int totalWarga = int.tryParse('${_b3Summary['total_warga'] ?? 0}') ?? 0;
+    int dijemput = int.tryParse('${_b3Summary['dijemput'] ?? 0}') ?? 0;
     double progress = totalWarga > 0 ? (dijemput / totalWarga) : 0.0;
-    String wilayah = _b3Summary['wilayah'] ?? 'Kec. Bagor';
+    final wilayah = (_b3Summary['wilayah'] ?? '').toString();
+    final labelRute = wilayah.startsWith('Kec.') ? 'Rute $wilayah' : 'Belum ada rute aktif';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -929,7 +944,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                       ),
                     ),
                     Text(
-                      'Rute $wilayah',
+                      labelRute,
                       style: const TextStyle(
                         color: Colors.grey,
                         fontSize: 11,
@@ -970,7 +985,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                       initialTab: 'rute_b3',
                     ),
                   ),
-                );
+                ).then((_) => _fetchB3Summary());
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),

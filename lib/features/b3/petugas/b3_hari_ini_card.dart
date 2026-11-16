@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../config/api_config.dart';
+import 'petugas_session.dart';
 
 class B3HariIniCard extends StatefulWidget {
   const B3HariIniCard({super.key});
@@ -15,7 +17,7 @@ class _B3HariIniCardState extends State<B3HariIniCard> {
   String wilayah = 'Kec. Bagor';
   bool isLoading = true;
 
-  final String baseUrl = "http://10.0.2.2:8000/api";
+  String get baseUrl => ApiConfig.baseUrl;
 
   @override
   void initState() {
@@ -25,7 +27,8 @@ class _B3HariIniCardState extends State<B3HariIniCard> {
 
   Future<void> fetchRingkasan() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/petugas/b3-ringkasan'));
+      final idPetugas = await PetugasSession.getId();
+      final response = await http.get(Uri.parse('$baseUrl/petugas/b3-ringkasan?id_petugas=$idPetugas'));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final data = decoded['data'];
@@ -35,6 +38,8 @@ class _B3HariIniCardState extends State<B3HariIniCard> {
           wilayah = data['wilayah'] ?? 'Kec. Bagor';
           isLoading = false;
         });
+      } else {
+        setState(() => isLoading = false);
       }
     } catch (e) {
       setState(() => isLoading = false);

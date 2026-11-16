@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../config/api_config.dart';
 import 'daftar_warga_desa_screen.dart';
+import 'petugas_session.dart';
 
 class B3RuteScreen extends StatefulWidget {
   const B3RuteScreen({super.key});
@@ -16,8 +18,9 @@ class _B3RuteScreenState extends State<B3RuteScreen> {
   double _totalBerat = 0;
   int _dijemput = 0;
   List<dynamic> _listDesa = [];
+  String _wilayah = '';
 
-  final String baseUrl = "http://10.0.2.2:8000/api";
+  String get baseUrl => ApiConfig.baseUrl;
 
   @override
   void initState() {
@@ -27,7 +30,8 @@ class _B3RuteScreenState extends State<B3RuteScreen> {
 
   Future<void> _fetchRuteData() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/petugas/b3-rute'));
+      final idPetugas = await PetugasSession.getId();
+      final response = await http.get(Uri.parse('$baseUrl/petugas/b3-rute?id_petugas=$idPetugas'));
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         final data = decoded['data'];
@@ -36,6 +40,7 @@ class _B3RuteScreenState extends State<B3RuteScreen> {
           _totalBerat = double.tryParse(data['total_berat'].toString()) ?? 0.0;
           _dijemput = data['dijemput'] ?? 0;
           _listDesa = data['list_desa'] ?? [];
+          _wilayah = (data['wilayah'] ?? '').toString();
           _isLoading = false;
         });
       } else {
@@ -75,7 +80,7 @@ class _B3RuteScreenState extends State<B3RuteScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Rute Kec. Bagor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1B5E20))),
+                        Text(_wilayah.isEmpty ? 'Rute Penjemputan' : 'Rute $_wilayah', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1B5E20))),
                         const SizedBox(height: 4),
                         const Text('Periode Berjalan • Status Aktif', style: TextStyle(fontSize: 11, color: Colors.grey)),
                         const SizedBox(height: 14),
@@ -126,9 +131,12 @@ class _B3RuteScreenState extends State<B3RuteScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => DaftarWargaDesaScreen(namaDesa: desa['nama_desa']),
+                              builder: (_) => DaftarWargaDesaScreen(
+                                namaDesa: desa['nama_desa'],
+                                idDesa: desa['id_desa'],
+                              ),
                             ),
-                          );
+                          ).then((_) => _fetchRuteData());
                         },
                         child: Container(
                           padding: const EdgeInsets.all(16),

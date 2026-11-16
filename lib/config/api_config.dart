@@ -81,6 +81,17 @@ class ApiConfig {
   static String riwayatSetorPetugas(int idPetugas) =>
       '$baseUrl/riwayat-setor-admin/$idPetugas';
 
+  // ==================== ♻️ B3 PETUGAS (PENJEMPUTAN) ====================
+  // id_petugas dikirim lewat query / body (lihat PetugasSession.getId()).
+  static String get petugasB3Ringkasan => '$baseUrl/petugas/b3-ringkasan';
+  static String get petugasB3Rute => '$baseUrl/petugas/b3-rute';
+  static String get petugasB3Tasks => '$baseUrl/petugas/b3-tasks';
+  static String petugasB3TaskStatus(dynamic idTask) =>
+      '$baseUrl/petugas/b3-tasks/$idTask/status'; // POST multipart (foto)
+  static String get petugasB3Muatan => '$baseUrl/petugas/b3-muatan';
+  static String get petugasB3RuteSelesai => '$baseUrl/petugas/b3-rute/selesai';
+  static String get petugasB3Riwayat => '$baseUrl/petugas/b3-riwayat';
+
   // ==================== 📍 INFO TPS ====================
   static String get infoTps => '$baseUrl/tps';
 
