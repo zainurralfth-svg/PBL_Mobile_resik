@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:resik/features/admin/daftar_warga_desa_screen.dart';
+import 'package:resik/features/b3/petugas/daftar_warga_desa_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,6 +10,8 @@ import 'package:geocoding/geocoding.dart';
 import 'package:intl/intl.dart';
 import '../../config/api_config.dart';
 import 'home_admin_screen.dart';
+import 'package:resik/features/b3/petugas/b3_ringkasan_screen.dart'; // Import halaman ringkasan muatan
+import 'package:resik/features/b3/petugas/petugas_session.dart';
 
 class PenjemputanScreen extends StatefulWidget {
   final String? initialTab;
@@ -33,12 +35,74 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
   bool _isFormLoading = false;
   Map<String, dynamic>? _adminData;
 
+  // State Rute B3 (dari database)
+  bool _b3Loading = true;
+  String? _b3Error;
+  String _b3Wilayah = '';
+  String? _b3Jadwal;
+  int _b3TotalWarga = 0;
+  int _b3Dijemput = 0;
+  double _b3TotalBerat = 0;
+  List<Map<String, dynamic>> _b3ListDesa = [];
+
   @override
   void initState() {
     super.initState();
     _activeBubble = widget.initialTab ?? 'rute_b3';
     _loadAdminData();
+    _fetchB3Rute();
   }
+
+  // GET /petugas/b3-rute?id_petugas=..
+  Future<void> _fetchB3Rute() async {
+    if (mounted) {
+      setState(() {
+        _b3Loading = true;
+        _b3Error = null;
+      });
+    }
+    try {
+      final idPetugas = await PetugasSession.getId();
+      if (idPetugas == null) {
+        throw 'Sesi petugas tidak ditemukan. Silakan login ulang.';
+      }
+      final res = await http
+          .get(
+            Uri.parse('${ApiConfig.petugasB3Rute}?id_petugas=$idPetugas'),
+            headers: ApiConfig.headers,
+          )
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode != 200) {
+        throw 'Gagal memuat rute (${res.statusCode}).';
+      }
+      final data = jsonDecode(res.body)['data'];
+      String? jadwal;
+      final tgl = DateTime.tryParse('${data['jadwal_jemput'] ?? ''}');
+      if (tgl != null) jadwal = DateFormat('dd/MM/yyyy').format(tgl);
+
+      if (!mounted) return;
+      setState(() {
+        _b3Wilayah = (data['wilayah'] ?? '').toString();
+        _b3Jadwal = jadwal;
+        _b3TotalWarga = int.tryParse('${data['total_warga']}') ?? 0;
+        _b3Dijemput = int.tryParse('${data['dijemput']}') ?? 0;
+        _b3TotalBerat = double.tryParse('${data['total_berat']}') ?? 0;
+        _b3ListDesa = (data['list_desa'] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _b3Loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetch rute B3: $e');
+      if (!mounted) return;
+      setState(() {
+        _b3Error = e is String ? e : 'Tidak dapat terhubung ke server.';
+        _b3Loading = false;
+      });
+    }
+  }
+
+  String _fmtKg(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
   @override
   void dispose() {
@@ -717,90 +781,144 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
     );
   }
 
-  // --- KONTEN RUTE B3 ---
+  // --- KONTEN RUTE B3 (data dari database) ---
   Widget _buildKontenRuteB3() {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
+    if (_b3Loading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)));
+    }
+    if (_b3Error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Rute Kec. Bagor',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1B5E20),
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Periode Oktober 2026 • Kamis, 29 Okt 2026',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Progres rute', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text('3 / 8 warga', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: const LinearProgressIndicator(
-                  value: 3 / 8,
-                  backgroundColor: Color(0xFFE8F5E9),
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-                  minHeight: 8,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _buildB3StatCard('8', 'Warga', const Color(0xFFF1F8E9), const Color(0xFF2E7D32))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildB3StatCard('62', 'Est. kg', const Color(0xFFE3F2FD), const Color(0xFF1976D2))),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildB3StatCard('3', 'Dijemput', const Color(0xFFFFF3E0), const Color(0xFFF57C00))),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Desa dalam Rute',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
-              ),
+              Text(_b3Error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 12),
-              _buildDesaB3Item('Desa Bagor', '3 / 4 warga dijemput • est. 24 kg'),
-              _buildDesaB3Item('Desa Balongrejo', '0 / 2 warga dijemput • est. 18 kg'),
-              _buildDesaB3Item('Desa Kedungsumber', '0 / 1 warga dijemput • est. 12 kg'),
-              _buildDesaB3Item('Desa Banaran', '0 / 1 warga dijemput • est. 8 kg'),
+              OutlinedButton(onPressed: _fetchB3Rute, child: const Text('Coba lagi')),
             ],
           ),
         ),
-      ],
+      );
+    }
+
+    final progress = _b3TotalWarga > 0 ? _b3Dijemput / _b3TotalWarga : 0.0;
+    final judul = _b3Wilayah.startsWith('Kec.') ? 'Rute $_b3Wilayah' : 'Belum ada rute aktif';
+
+    return RefreshIndicator(
+      color: const Color(0xFF2E7D32),
+      onRefresh: _fetchB3Rute,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  judul,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _b3Jadwal != null ? 'Jadwal penjemputan: $_b3Jadwal' : 'Periode berjalan',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Progres rute', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(
+                      '$_b3Dijemput / $_b3TotalWarga warga',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: const Color(0xFFE8F5E9),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
+                    minHeight: 8,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _buildB3StatCard('$_b3TotalWarga', 'Warga', const Color(0xFFF1F8E9), const Color(0xFF2E7D32))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildB3StatCard(_fmtKg(_b3TotalBerat), 'Est. kg', const Color(0xFFE3F2FD), const Color(0xFF1976D2))),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildB3StatCard('$_b3Dijemput', 'Dijemput', const Color(0xFFFFF3E0), const Color(0xFFF57C00))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Desa dalam Rute',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                ),
+                const SizedBox(height: 12),
+                if (_b3ListDesa.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Text('Belum ada desa pada rute ini.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ),
+                  )
+                else
+                  for (final desa in _b3ListDesa) _buildDesaB3Item(desa),
+                const SizedBox(height: 16),
+                // Tombol Ringkasan Muatan (desain P2) -> halaman P6
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const B3RingkasanScreen()),
+                      ).then((_) => _fetchB3Rute());
+                    },
+                    icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                    label: const Text(
+                      'Ringkasan Muatan',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2E7D32),
+                      side: const BorderSide(color: Color(0xFF2E7D32)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -818,7 +936,13 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
     );
   }
 
-  Widget _buildDesaB3Item(String namaDesa, String info) {
+  Widget _buildDesaB3Item(Map<String, dynamic> desa) {
+    final namaDesa = (desa['nama_desa'] ?? 'Desa').toString();
+    final dijemput = desa['dijemput_desa'] ?? 0;
+    final total = desa['total_warga_desa'] ?? 0;
+    final est = desa['est_berat_desa'] ?? 0;
+    final status = (desa['status_rute'] ?? 'Dijadwalkan').toString();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -828,7 +952,10 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Text(namaDesa, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text(info, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        subtitle: Text(
+          '$dijemput / $total warga dijemput • est. $est kg',
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
@@ -837,10 +964,10 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
-              Text('Dijadwalkan', style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
-              SizedBox(width: 4),
-              Icon(Icons.chevron_right, size: 14, color: Color(0xFF2E7D32)),
+            children: [
+              Text(status, style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, size: 14, color: Color(0xFF2E7D32)),
             ],
           ),
         ),
@@ -848,9 +975,12 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => DaftarWargaDesaScreen(namaDesa: namaDesa),
+              builder: (_) => DaftarWargaDesaScreen(
+                namaDesa: namaDesa,
+                idDesa: int.tryParse('${desa['id_desa']}'),
+              ),
             ),
-          );
+          ).then((_) => _fetchB3Rute());
         },
       ),
     );

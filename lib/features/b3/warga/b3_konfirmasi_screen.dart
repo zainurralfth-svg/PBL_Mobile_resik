@@ -1,19 +1,27 @@
 // lib/features/b3/warga/b3_konfirmasi_screen.dart
 //
-// W5 · Konfirmasi Pendaftaran B3 (warga) — TAMPILAN SAJA.
-// Tombol "Kirim Pendaftaran" belum memanggil backend.
+// W5 · Konfirmasi Pendaftaran B3 (warga). Tombol kirim memanggil B3Service.daftar.
 // Alur: W4 Form -> [W5 Konfirmasi] -> W6 Terkirim
 
 import 'package:flutter/material.dart';
 
+import '../../../services/b3_service.dart';
 import 'b3_form_screen.dart' show B3FormData;
 import 'b3_terkirim_screen.dart';
 
-class B3KonfirmasiScreen extends StatelessWidget {
+class B3KonfirmasiScreen extends StatefulWidget {
   /// Kalau tidak diisi, dipakai data contoh (bisa dibuka sendiri tanpa W4).
   final B3FormData data;
 
   const B3KonfirmasiScreen({super.key, this.data = const B3FormData()});
+
+  @override
+  State<B3KonfirmasiScreen> createState() => _B3KonfirmasiScreenState();
+}
+
+class _B3KonfirmasiScreenState extends State<B3KonfirmasiScreen> {
+  B3FormData get data => widget.data;
+  bool _loading = false;
 
   static const _green = Color(0xFF2E7D32);
   static const _greenDark = Color(0xFF1B5E20);
@@ -23,12 +31,39 @@ class B3KonfirmasiScreen extends StatelessWidget {
   static const _warnBg = Color(0xFFF6EBC4);
   static const _warnFg = Color(0xFF7A5B00);
 
-  void _kirim(BuildContext context) {
-    // TODO: panggil backend di sini nanti, lalu pindah ke W6 kalau sukses.
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => B3TerkirimScreen(data: data)),
-    );
+  Future<void> _kirim(BuildContext context) async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final hasil = await B3Service.daftar(
+        idPeriode: data.idPeriode,
+        jenis: data.jenis,
+        beratKg: data.beratKg,
+        desa: data.desa,
+        alamat: data.alamat,
+        keterangan: data.keterangan,
+      );
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => B3TerkirimScreen(
+            data: data,
+            noPendaftaran: (hasil['no_pendaftaran'] ?? '-').toString(),
+            status: 'Terdaftar',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   @override
@@ -188,7 +223,7 @@ class B3KonfirmasiScreen extends StatelessWidget {
             child: SizedBox(
               height: 52,
               child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: _loading ? null : () => Navigator.pop(context),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _greenDark,
                   backgroundColor: _card,
@@ -210,7 +245,7 @@ class B3KonfirmasiScreen extends StatelessWidget {
             child: SizedBox(
               height: 52,
               child: ElevatedButton(
-                onPressed: () => _kirim(context),
+                onPressed: _loading ? null : () => _kirim(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _green,
                   foregroundColor: Colors.white,
@@ -219,10 +254,22 @@ class B3KonfirmasiScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(26),
                   ),
                 ),
-                child: const Text(
-                  'Kirim Pendaftaran',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
+                child: _loading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Kirim Pendaftaran',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
           ),
