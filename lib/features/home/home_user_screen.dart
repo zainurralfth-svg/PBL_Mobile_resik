@@ -1,6 +1,8 @@
+home_user_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:resik/features/b3/warga/b3_info_screen.dart';
+import 'package:resik/features/b3/warga/b3_riwayat_screen.dart';
 import '../../models/b3_model.dart';
 import '../../services/b3_service.dart';
 import 'dart:convert';
@@ -59,6 +61,12 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
 
   // Periode B3 untuk desa warga (dari web). Banner hanya tampil saat status 'Dibuka'.
   B3Periode? _periodeB3;
+
+  /// Pengingat penjemputan dari Sub Desa (W15). null = tidak ada pengingat.
+  /// Belum ada API-nya: isi dari server nanti. Contoh isi:
+  /// {'tanggal': 'Kamis, 29 Okt', 'pesan': 'siapkan kemasan di depan rumah', 'dari': 'Sub Desa Bagor'}
+  /// Untuk melihat tampilannya sekarang, ganti `null` di bawah dengan contoh itu.
+  Map<String, String>? _pengingatB3;
 
   Future<void> _handleRefresh() async {
     await _fetchSaldo();
@@ -727,6 +735,71 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
 // ✅ WIDGET KHUSUS BANNER B3
   // Tampil hanya kalau admin sudah membuat periode untuk desa warga dan
   // statusnya 'Dibuka'. Saat belum dibuka atau sudah ditutup, banner hilang.
+  /// W15 · kartu "Pengingat penjemputan B3" dari Sub Desa.
+  Widget _buildPengingatB3() {
+    final p = _pengingatB3;
+    if (p == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF4DC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFF2B34C), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5A623),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Pengingat penjemputan B3',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF8A5A00)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${p['tanggal'] ?? ''} · ${p['pesan'] ?? ''}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF6B5A2E), height: 1.3),
+                  ),
+                  if ((p['dari'] ?? '').isNotEmpty)
+                    Text('Dari ${p['dari']}', style: const TextStyle(fontSize: 10.5, color: Color(0xFF9A8A5E))),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const B3RiwayatScreen()),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                minimumSize: const Size(0, 32),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Detail', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildB3Banner() {
     final periode = _periodeB3;
     if (periode == null || periode.status != 'Dibuka') {
@@ -872,6 +945,7 @@ class _HomeUserScreenState extends State<HomeUserScreen> {
                 ),
               ),
 // ✅ TAMBAHKAN BANNER B3 DI SINI
+              _buildPengingatB3(),
               _buildB3Banner(),
               if (_periodeB3?.status == 'Dibuka') const SizedBox(height: 24),
 

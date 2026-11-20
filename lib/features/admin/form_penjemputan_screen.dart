@@ -1,4 +1,5 @@
-import 'dart:io';
+form_penjemputan_screen.dart
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -24,7 +25,7 @@ class _FormPenjemputanScreenState extends State<FormPenjemputanScreen> {
   final _beratCtrl = TextEditingController();
   final _keteranganCtrl = TextEditingController();
 
-  File? _imageFile;
+  Uint8List? _imageBytes;
   final _picker = ImagePicker();
   bool _isLoading = false;
   Map<String, dynamic>? _adminData;
@@ -55,7 +56,9 @@ class _FormPenjemputanScreenState extends State<FormPenjemputanScreen> {
       imageQuality: 85,
     );
     if (picked != null) {
-      setState(() => _imageFile = File(picked.path));
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      setState(() => _imageBytes = bytes);
     }
   }
 
@@ -267,11 +270,11 @@ class _FormPenjemputanScreenState extends State<FormPenjemputanScreen> {
       request.fields['keterangan'] = _keteranganCtrl.text;
       request.fields['status'] = 'diproses';
 
-      if (_imageFile != null) {
+      if (_imageBytes != null) {
         request.files.add(
-          await http.MultipartFile.fromPath(
+          http.MultipartFile.fromBytes(
             'foto',
-            _imageFile!.path,
+            _imageBytes!,
             filename:
                 'penjemputan_${DateTime.now().millisecondsSinceEpoch}.jpg',
           ),
@@ -543,10 +546,10 @@ class _FormPenjemputanScreenState extends State<FormPenjemputanScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _imageFile != null
+                color: _imageBytes != null
                     ? const Color(0xFF4CAF50)
                     : Colors.grey.shade200,
-                width: _imageFile != null ? 2 : 1,
+                width: _imageBytes != null ? 2 : 1,
               ),
               boxShadow: [
                 BoxShadow(
@@ -556,13 +559,13 @@ class _FormPenjemputanScreenState extends State<FormPenjemputanScreen> {
                 ),
               ],
             ),
-            child: _imageFile != null
+            child: _imageBytes != null
                 ? Stack(
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(11),
-                        child: Image.file(
-                          _imageFile!,
+                        child: Image.memory(
+                          _imageBytes!,
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,

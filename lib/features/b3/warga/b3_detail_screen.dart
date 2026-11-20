@@ -1,3 +1,4 @@
+detail_screen.dart
 // lib/features/b3/warga/b3_detail_screen.dart
 import 'dart:convert';
 
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../config/api_config.dart';
+import 'b3_info_screen.dart';
 
 /// Ubah ke false setelah endpoint detail B3 siap.
 const bool kB3DetailUseDummy = false;
@@ -27,6 +29,7 @@ enum B3DetailStatus {
   menungguVerifikasi,
   diverifikasi,
   tidakSesuai,
+  tidakAda, // petugas datang, warga tidak ada di tempat
 }
 
 class B3Detail {
@@ -41,8 +44,11 @@ class B3Detail {
   final String? beratDijemput;
   final String? tanggalDijemput;
   final String? tanggalDiperiksa;
+  final String? tanggalTidakAda;
   final B3DetailStatus status;
   final String? alasan;
+  final double? saldo; // total imbalan (Diverifikasi)
+  final String? rincianSaldo; // "Baterai 50 × Rp 1.000 + ..."
 
   const B3Detail({
     required this.noPendaftaran,
@@ -57,7 +63,10 @@ class B3Detail {
     this.beratDijemput,
     this.tanggalDijemput,
     this.tanggalDiperiksa,
+    this.tanggalTidakAda,
     this.alasan,
+    this.saldo,
+    this.rincianSaldo,
   });
 
   factory B3Detail.fromJson(Map<String, dynamic> j) {
@@ -70,6 +79,10 @@ class B3Detail {
       case 'tidak_sesuai':
       case 'ditolak':
         st = B3DetailStatus.tidakSesuai;
+        break;
+      case 'tidak_ada_di_tempat':
+      case 'tidak_ada':
+        st = B3DetailStatus.tidakAda;
         break;
       case 'terdaftar':
         st = B3DetailStatus.terdaftar;
@@ -95,7 +108,10 @@ class B3Detail {
           : '${j['berat_dijemput']} kg',
       tanggalDijemput: j['tanggal_dijemput']?.toString(),
       tanggalDiperiksa: j['tanggal_diperiksa']?.toString(),
+      tanggalTidakAda: j['tanggal_tidak_ada']?.toString(),
       alasan: j['alasan']?.toString(),
+      saldo: j['total_imbalan'] == null ? null : double.tryParse('${j['total_imbalan']}'),
+      rincianSaldo: j['rincian_saldo']?.toString(),
     );
   }
 }
@@ -151,9 +167,24 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
   }
 
   /// Data contoh. ID mengikuti data contoh di Riwayat B3:
-  /// 1 = Dijadwalkan, 2 = Diverifikasi, 3 = Tidak sesuai.
+  /// 1 = Dijadwalkan, 2 = Diverifikasi, 3 = Tidak sesuai, 4 = Tidak ada di tempat.
   B3Detail _dummyDetail(int id) {
     switch (id) {
+      case 4:
+        return const B3Detail(
+          noPendaftaran: '#B3-00009',
+          jenis: 'Lampu',
+          estimasiBerat: '2.4 kg',
+          alamat: 'Jl. Wilangan Kulon No. 12, Desa Bagor',
+          jadwalJemput: 'Selasa, 28 Jul 2026',
+          petugas: 'Budi Santoso',
+          tanggalDaftar: '10 Jul 2026 · 19:40',
+          tanggalDijadwalkan: '20 Jul 2026',
+          tanggalTidakAda: '28 Jul 2026',
+          status: B3DetailStatus.tidakAda,
+          alasan:
+              'Rumah kosong saat petugas datang. Pendaftaran ini tidak dihitung, silakan daftar lagi di periode berikutnya.',
+        );
       case 2:
         return const B3Detail(
           noPendaftaran: '#B3-00018',
@@ -213,7 +244,44 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
       ),
       bottomNavigationBar: _data?.status == B3DetailStatus.tidakSesuai
           ? _packingButton()
+          : _data?.status == B3DetailStatus.tidakAda
+          ? _periodeButton()
           : null,
+    );
+  }
+
+  /// Tombol "Lihat Periode B3" (W13): kembali ke layar Sampah B3 untuk daftar lagi.
+  Widget _periodeButton() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _C.green,
+              backgroundColor: _C.card,
+              side: const BorderSide(color: _C.green, width: 1.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const B3InfoScreen()),
+                (route) => route.isFirst,
+              );
+            },
+            child: const Text(
+              'Lihat Periode B3',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -319,10 +387,20 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           _infoCard(d),
-          if (d.status == B3DetailStatus.tidakSesuai &&
+          if (d.status == B3DetailStatus.diverifikasi && (d.saldo ?? 0) > 0) ...[
+            const SizedBox(height: 14),
+            _saldoCard(d),
+          ],
+          if ((d.status == B3DetailStatus.tidakSesuai ||
+                  d.status == B3DetailStatus.tidakAda) &&
               (d.alasan ?? '').isNotEmpty) ...[
             const SizedBox(height: 14),
-            _alasanCard(d.alasan!),
+            _alasanCard(
+              d.alasan!,
+              judul: d.status == B3DetailStatus.tidakAda
+                  ? 'Alasan'
+                  : 'Alasan Tidak Sesuai',
+            ),
           ],
           const SizedBox(height: 22),
           const Text(
@@ -384,7 +462,8 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
           ),
           const SizedBox(height: 6),
           if (d.status == B3DetailStatus.terdaftar ||
-              d.status == B3DetailStatus.dijadwalkan) ...[
+              d.status == B3DetailStatus.dijadwalkan ||
+              d.status == B3DetailStatus.tidakAda) ...[
             _row(Icons.battery_charging_full_outlined, 'Jenis B3', d.jenis),
             _row(Icons.scale_outlined, 'Estimasi berat', d.estimasiBerat),
             _row(Icons.location_on_outlined, 'Alamat jemput', d.alamat),
@@ -415,7 +494,43 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
     );
   }
 
-  Widget _alasanCard(String alasan) {
+  /// Kartu "Saldo bertambah" saat pendaftaran Diverifikasi.
+  Widget _saldoCard(B3Detail d) {
+    final rp = 'Rp ${d.saldo!.round().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]}.')}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCEFD9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFB7E0C3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.account_balance_wallet_outlined, size: 20, color: _C.green),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Saldo bertambah $rp',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _C.green),
+                ),
+                if ((d.rincianSaldo ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(d.rincianSaldo!, style: const TextStyle(fontSize: 10.5, color: _C.muted)),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _alasanCard(String alasan, {String judul = 'Alasan Tidak Sesuai'}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -428,12 +543,12 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.warning_amber_rounded, size: 14, color: _C.red),
-              SizedBox(width: 5),
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 14, color: _C.red),
+              const SizedBox(width: 5),
               Text(
-                'Alasan Tidak Sesuai',
-                style: TextStyle(
+                judul,
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   color: _C.red,
@@ -524,6 +639,11 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
         bg = const Color(0xFFF6C9C4);
         fg = _C.red;
         break;
+      case B3DetailStatus.tidakAda:
+        label = 'Tidak ada di tempat';
+        bg = const Color(0xFFFBE0DC);
+        fg = _C.red;
+        break;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -550,6 +670,7 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
         level = 1;
         break;
       case B3DetailStatus.dijadwalkan:
+      case B3DetailStatus.tidakAda:
         level = 2;
         break;
       case B3DetailStatus.menungguVerifikasi:
@@ -566,7 +687,25 @@ class _B3DetailScreenState extends State<B3DetailScreen> {
         ? 'Admin memeriksa berat dan jenis'
         : 'Diperiksa admin · ${d.tanggalDiperiksa}';
 
-    final steps = <_Step>[
+    // Tidak ada di tempat: alur berhenti di sini (W13).
+    final steps = d.status == B3DetailStatus.tidakAda
+        ? <_Step>[
+            _Step('Terdaftar', d.tanggalDaftar, done: true),
+            _Step(
+              'Dijadwalkan',
+              'Petugas ditugaskan · ${d.tanggalDijadwalkan}',
+              done: true,
+            ),
+            _Step(
+              'Tidak ada di tempat',
+              d.tanggalTidakAda == null
+                  ? 'Dicatat petugas'
+                  : 'Dicatat petugas · ${d.tanggalTidakAda}',
+              done: true,
+              error: true,
+            ),
+          ]
+        : <_Step>[
       _Step('Terdaftar', d.tanggalDaftar, done: true),
       _Step(
         'Dijadwalkan',

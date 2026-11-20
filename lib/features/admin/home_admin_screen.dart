@@ -1,5 +1,7 @@
+home_admin_screen.dart
 import 'package:flutter/material.dart';
 import 'package:resik/features/admin/penjemputan_screen.dart';
+import 'package:resik/features/b3/petugas/petugas_session.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -34,12 +36,17 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   bool _isLoadingStats = true;
   int _notificationCount = 0;
 
+  // State untuk Ringkasan B3 dari Database
+  Map<String, dynamic> _b3Summary = {};
+  bool _isLoadingB3 = true;
+
   @override
   void initState() {
     super.initState();
     _loadAdminData();
     _fetchArtikel();
     _fetchStatistik();
+    _fetchB3Summary();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<StatistikProvider>().fetchStatistik();
@@ -51,6 +58,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     await Future.wait([
       _fetchArtikel(),
       _fetchStatistik(),
+      _fetchB3Summary(),
       _fetchNotificationCount(),
       context.read<StatistikProvider>().fetchStatistik(),
     ]);
@@ -61,9 +69,8 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     final userData = prefs.getString('user_data');
     if (userData != null && mounted) {
       setState(() => _adminData = jsonDecode(userData));
-
-      // Fetch badge SETELAH _adminData terisi
       _fetchNotificationCount();
+      _fetchB3Summary();
     }
   }
 
@@ -89,7 +96,39 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     }
   }
 
-  // ✅ FETCH STATISTIK
+  // Ambil Data Ringkasan B3 Langsung dari Database via API
+  Future<void> _fetchB3Summary() async {
+    try {
+      // Endpoint petugas wajib menerima id_petugas; tanpa itu server membalas 422.
+      final idPetugas = await PetugasSession.getId();
+      if (idPetugas == null) {
+        if (mounted) setState(() => _isLoadingB3 = false);
+        return;
+      }
+      final response = await http
+          .get(
+            Uri.parse('${ApiConfig.petugasB3Ringkasan}?id_petugas=$idPetugas'),
+            headers: ApiConfig.headers,
+          )
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result['success'] == true) {
+          setState(() {
+            _b3Summary = Map<String, dynamic>.from(result['data'] ?? {});
+            _isLoadingB3 = false;
+          });
+          return;
+        }
+      }
+      setState(() => _isLoadingB3 = false);
+    } catch (e) {
+      debugPrint('Error ringkasan B3: $e');
+      if (mounted) setState(() => _isLoadingB3 = false);
+    }
+  }
+
   Future<void> _fetchStatistik() async {
     if (_adminData == null) return;
 
@@ -115,10 +154,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
   }
 
   Future<void> _fetchNotificationCount() async {
-    if (_adminData == null) {
-      debugPrint("⚠️ _fetchNotificationCount: _adminData masih null!");
-      return;
-    }
+    if (_adminData == null) return;
 
     try {
       final userId = _adminData!['id_petugas'].toString();
@@ -126,33 +162,22 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
         ApiConfig.baseUrl + '/notifications/unread-count',
       ).replace(queryParameters: {'user_id': userId, 'tipe': 'petugas'});
 
-      debugPrint('🔔 Fetching notif count... userId=$userId');
-
       final response = await http.get(uri).timeout(const Duration(seconds: 5));
-
-      debugPrint('📥 Status: ${response.statusCode}');
-      debugPrint('📄 Response: ${response.body}');
 
       if (response.statusCode == 200 && mounted) {
         final result = jsonDecode(response.body);
         if (result['status'] == 'success') {
           final count = result['data']['unread_count'] ?? 0;
-          debugPrint('✅ Unread count: $count');
           setState(() {
             _notificationCount = count;
           });
-        } else {
-          debugPrint('❌ Status bukan success: ${result['status']}');
         }
-      } else {
-        debugPrint('❌ HTTP error: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('❌ Error notif count: $e');
     }
   }
 
-  // LOGOUT FUNCTION
   Future<void> _handleLogout() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -165,7 +190,6 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon Container dengan Gradient
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -188,8 +212,6 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Title
               const Text(
                 'Keluar dari Akun?',
                 style: TextStyle(
@@ -200,8 +222,6 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-
-              // Description
               Text(
                 'Apakah Anda yakin ingin keluar dari sesi petugas?',
                 style: TextStyle(
@@ -212,11 +232,8 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-
-              // Buttons
               Row(
                 children: [
-                  // Tombol Batal
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(ctx, false),
@@ -241,8 +258,6 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-
-                  // Tombol Keluar
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(ctx, true),
@@ -285,7 +300,7 @@ class _HomeAdminScreenState extends State<HomeAdminScreen> {
     }
   }
 
-void _onNavTap(int index) {
+  void _onNavTap(int index) {
     setState(() {
       _selectedIndex = index;
     });
@@ -542,7 +557,6 @@ void _onNavTap(int index) {
     );
   }
 
-  // HEADER - TANPA NAVIGASI PROFILE, TOMBOL LOGOUT
   Widget _buildHeader() {
     final nama = _adminData?['nama_lengkap'] ?? 'Admin';
     final foto = _adminData?['foto'];
@@ -591,8 +605,6 @@ void _onNavTap(int index) {
             ),
           ),
           const SizedBox(width: 8),
-
-          // ✅ ICON NOTIFIKASI DENGAN BADGE (POLA DARI USER SCREEN - PROVEN WORKS!)
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -604,14 +616,13 @@ void _onNavTap(int index) {
                       builder: (_) => const NotificationListScreenAdmin(),
                     ),
                   ).then((_) {
-                    // ✅ Refresh badge setelah kembali dari notifikasi
                     if (mounted) _fetchNotificationCount();
                   });
                 },
                 borderRadius: BorderRadius.circular(30),
-                child: Padding(
-                  padding: const EdgeInsets.all(8), // ✅ Area tap lebih besar
-                  child: const Icon(
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(
                     Icons.notifications_rounded,
                     color: Colors.white,
                     size: 28,
@@ -623,7 +634,6 @@ void _onNavTap(int index) {
                   right: 2,
                   top: 2,
                   child: IgnorePointer(
-                    // ✅ KUNCI! Badge tidak menghalangi klik!
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
@@ -650,8 +660,6 @@ void _onNavTap(int index) {
             ],
           ),
           const SizedBox(width: 12),
-
-          // TOMBOL LOGOUT
           InkWell(
             onTap: _handleLogout,
             borderRadius: BorderRadius.circular(30),
@@ -673,7 +681,7 @@ void _onNavTap(int index) {
     );
   }
 
-Widget _buildBody() {
+  Widget _buildBody() {
     return Container(
       margin: const EdgeInsets.only(top: 20),
       padding: const EdgeInsets.all(16),
@@ -685,15 +693,10 @@ Widget _buildBody() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // STATISTIK SECTION 
             _buildStatistikSection(),
             const SizedBox(height: 16),
-
-            // ✅ TAMBAHKAN BANNER B3 DI SINI
-            _buildB3AdminBanner(),
+            _buildB3AdminBanner(), // Banner B3 Terhubung ke Database
             const SizedBox(height: 24),
-
-            // Artikel Edukasi
             _buildSectionTitle(
               'Artikel Edukasi',
               onViewAll: () => Navigator.push(
@@ -701,7 +704,6 @@ Widget _buildBody() {
                 MaterialPageRoute(builder: (_) => const ArtikelListScreen()),
               ),
             ),
-// ... lanjutan kode sebelumnya ...
             const SizedBox(height: 12),
             _isLoadingArtikel
                 ? const Center(child: CircularProgressIndicator())
@@ -714,8 +716,6 @@ Widget _buildBody() {
                   )
                 : _buildArtikelList(),
             const SizedBox(height: 24),
-
-            // Jenis Sampah
             _buildSectionTitle(
               'Jenis Sampah',
               onViewAll: () => Navigator.push(
@@ -762,12 +762,12 @@ Widget _buildBody() {
                 Color(0xFFE8F5E9),
                 Color(0xFFC8E6C9),
                 Color(0xFFA5D6A7),
-              ], // ← BIRU
+              ],
             ),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF4CAF50).withOpacity(0.15), // ← HIJAU
+                color: const Color(0xFF4CAF50).withOpacity(0.15),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -776,7 +776,6 @@ Widget _buildBody() {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 children: [
                   Container(
@@ -805,9 +804,6 @@ Widget _buildBody() {
                 ],
               ),
               const SizedBox(height: 12),
-
-
-              // TAMBAH: Info periode
               if (stats['periode'] != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -820,8 +816,6 @@ Widget _buildBody() {
                     ),
                   ),
                 ),
-
-              // Grid 2x2
               Row(
                 children: [
                   Expanded(
@@ -866,8 +860,6 @@ Widget _buildBody() {
                 ],
               ),
               const SizedBox(height: 12),
-
-              // Total Nominal & Berat
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -911,15 +903,21 @@ Widget _buildBody() {
     );
   }
 
-// ✅ WIDGET KHUSUS BANNER B3 ADMIN
+  // BANNER B3 ADMIN DINAMIS (TERHUBUNG KE DATABASE)
   Widget _buildB3AdminBanner() {
-    return Container(
+    int totalWarga = int.tryParse('${_b3Summary['total_warga'] ?? 0}') ?? 0;
+    int dijemput = int.tryParse('${_b3Summary['dijemput'] ?? 0}') ?? 0;
+    double progress = totalWarga > 0 ? (dijemput / totalWarga) : 0.0;
+    final wilayah = (_b3Summary['wilayah'] ?? '').toString();
+    final labelRute = wilayah.startsWith('Kec.') ? 'Rute $wilayah' : 'Belum ada rute aktif';
+
+    return CustomPaint(
+      foregroundPainter: _DashedRRectPainter(color: Colors.orange.shade400, radius: 16),
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        // Menggunakan border solid warna oranye menyesuaikan desain UI
-        border: Border.all(color: Colors.orange.shade300, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,11 +933,11 @@ Widget _buildBody() {
                 child: const Icon(Icons.eco, color: Colors.white, size: 24),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Penjemputan B3 Hari Ini',
                       style: TextStyle(
                         color: Color(0xFF1B5E20),
@@ -948,8 +946,8 @@ Widget _buildBody() {
                       ),
                     ),
                     Text(
-                      'Rute Kec. Bagor - 29 Okt 2026',
-                      style: TextStyle(
+                      labelRute,
+                      style: const TextStyle(
                         color: Colors.grey,
                         fontSize: 11,
                       ),
@@ -964,16 +962,16 @@ Widget _buildBody() {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Sudah dijemput', style: TextStyle(fontSize: 11, color: Colors.grey)),
-              const Text('3 / 8 warga', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+              Text('$dijemput / $totalWarga warga', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
             ],
           ),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: const LinearProgressIndicator(
-              value: 3 / 8,
-              backgroundColor: Color(0xFFE8F5E9), // Background progress bar hijau muda
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)), // Progress bar hijau tua
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: const Color(0xFFE8F5E9),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
               minHeight: 6,
             ),
           ),
@@ -982,15 +980,15 @@ Widget _buildBody() {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const PenjemputanScreen(
-        initialTab: 'rute_b3',
-      ),
-    ),
-  );
-},
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PenjemputanScreen(
+                      initialTab: 'rute_b3',
+                    ),
+                  ),
+                ).then((_) => _fetchB3Summary());
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),
                 shape: RoundedRectangleBorder(
@@ -999,14 +997,15 @@ Widget _buildBody() {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 0,
               ),
-              child: const Text(
-                'Mulai Rute',
-                style: TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
+              child: Text(
+                dijemput > 0 ? 'Lanjutkan Rute' : 'Mulai Rute',
+                style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -1216,48 +1215,6 @@ Widget _buildBody() {
       ),
     ],
   );
-
-  Widget _buildInfoCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: const Color(0xFF4CAF50), size: 28),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
-              fontFamily: 'Montserrat',
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title == 'Saldo' ? 'Rp 0' : value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1B5E20),
-              fontFamily: 'Montserrat',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 String _formatRupiah(dynamic value) {
@@ -1266,4 +1223,35 @@ String _formatRupiah(dynamic value) {
       ? value.toDouble()
       : double.tryParse(value.toString()) ?? 0;
   return 'Rp ${angka.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}';
+}
+
+/// Garis putus-putus mengikuti sudut membulat (tanpa package tambahan).
+class _DashedRRectPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  const _DashedRRectPainter({required this.color, this.radius = 16});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Offset.zero & size,
+        Radius.circular(radius),
+      ));
+    for (final metrik in path.computeMetrics()) {
+      var jarak = 0.0;
+      while (jarak < metrik.length) {
+        canvas.drawPath(metrik.extractPath(jarak, jarak + 6), paint);
+        jarak += 10;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter old) =>
+      old.color != color || old.radius != radius;
 }
