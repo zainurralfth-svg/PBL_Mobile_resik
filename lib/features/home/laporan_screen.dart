@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -26,7 +26,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
   final _lokasiCtrl = TextEditingController();
   final _keteranganCtrl = TextEditingController();
 
-  File? _imageFile;
+  Uint8List? _imageBytes;
   final _picker = ImagePicker();
   bool _isLoading = false;
   bool _isGettingLocation = false;
@@ -60,7 +60,9 @@ class _LaporanScreenState extends State<LaporanScreen> {
       imageQuality: 85,
     );
     if (picked != null) {
-      setState(() => _imageFile = File(picked.path));
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      setState(() => _imageBytes = bytes);
     }
   }
 
@@ -279,7 +281,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
 
   Future<void> _submitLaporan() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_imageFile == null) {
+    if (_imageBytes == null) {
       _showError('Foto bukti wajib diupload');
       return;
     }
@@ -307,9 +309,9 @@ class _LaporanScreenState extends State<LaporanScreen> {
       request.fields['lokasi'] = _lokasiCtrl.text;
       request.fields['keterangan'] = _keteranganCtrl.text;
       request.files.add(
-        await http.MultipartFile.fromPath(
+        http.MultipartFile.fromBytes(
           'foto',
-          _imageFile!.path,
+          _imageBytes!,
           filename: 'laporan_${DateTime.now().millisecondsSinceEpoch}.jpg',
         ),
       );
@@ -733,7 +735,7 @@ class _LaporanScreenState extends State<LaporanScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
-                          border: _imageFile != null
+                          border: _imageBytes != null
                               ? null
                               : Border.all(
                                   color: const Color(
@@ -752,11 +754,11 @@ class _LaporanScreenState extends State<LaporanScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: _imageFile != null
+                          child: _imageBytes != null
                               ? Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    Image.file(_imageFile!, fit: BoxFit.cover),
+                                    Image.memory(_imageBytes!, fit: BoxFit.cover),
                                     Container(
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(

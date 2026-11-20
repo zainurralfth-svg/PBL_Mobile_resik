@@ -305,7 +305,9 @@ class _B3InfoScreenState extends State<B3InfoScreen> {
               child: Text(
                 p.pendaftaranDibuka
                     ? 'Daftar Sekarang'
-                    : 'Pendaftaran belum dibuka',
+                    : (p.status == 'Ditutup' || p.status == 'Selesai')
+                        ? 'Pendaftaran Ditutup ${p.tglTutup.day} ${formatTanggal(p.tglTutup).split(' ')[1]}'
+                        : 'Pendaftaran belum dibuka',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,

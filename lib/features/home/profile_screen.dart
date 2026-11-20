@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -19,7 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic> _userData = {};
 
   final _picker = ImagePicker();
-  File? _profileImageFile;
+  Uint8List? _profileImageBytes;
 
   // Controllers untuk Data Pribadi
   final _namaCtrl = TextEditingController();
@@ -84,8 +84,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (picked != null && mounted) {
+      final bytes = await picked.readAsBytes();
       setState(() {
-        _profileImageFile = File(picked.path);
+        _profileImageBytes = bytes;
       });
 
       // ✅ AUTO-SAVE SETELAH PILIH FOTO
@@ -192,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveProfileImage() async {
-    if (_profileImageFile == null) return;
+    if (_profileImageBytes == null) return;
 
     // ✅ FIX AMAN: Ambil ID berdasarkan tipe user
     final String tipe = _userData['tipe'] ?? '';
@@ -229,9 +230,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       request.fields['tipe'] = tipe;
 
       request.files.add(
-        await http.MultipartFile.fromPath(
+        http.MultipartFile.fromBytes(
           'foto',
-          _profileImageFile!.path,
+          _profileImageBytes!,
           filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
         ),
       );
@@ -252,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await _loadUserData();
           setState(() {
             _userData = updatedData;
-            _profileImageFile = null;
+            _profileImageBytes = null;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -453,7 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _isEditingDataPribadi = false;
       _isEditingKontak = false;
-      _profileImageFile = null;
+      _profileImageBytes = null;
     });
     _loadUserData(); // Reload data dari storage
   }
@@ -1977,7 +1978,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             GestureDetector(
                               onTap: () {
                                 // ✅ Tampilkan foto full screen jika ada
-                                if (_profileImageFile != null) {
+                                if (_profileImageBytes != null) {
                                   // Jika ada foto baru yang belum diupload
                                   showDialog(
                                     context: context,
@@ -1990,8 +1991,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             child: InteractiveViewer(
                                               minScale: 0.5,
                                               maxScale: 4.0,
-                                              child: Image.file(
-                                                _profileImageFile!,
+                                              child: Image.memory(
+                                                _profileImageBytes!,
                                                 fit: BoxFit.contain,
                                               ),
                                             ),
@@ -2052,9 +2053,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 ),
                                 child: ClipOval(
-                                  child: _profileImageFile != null
-                                      ? Image.file(
-                                          _profileImageFile!,
+                                  child: _profileImageBytes != null
+                                      ? Image.memory(
+                                          _profileImageBytes!,
                                           fit: BoxFit.cover,
                                         )
                                       : (_userData['foto'] != null &&
