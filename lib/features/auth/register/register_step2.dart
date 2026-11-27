@@ -12,6 +12,8 @@ class RegisterStep2 extends StatefulWidget {
   final String? job;
   final String? dinasId;
   final String? desaId;
+  final String email;
+  final String telepon;
 
   const RegisterStep2({
     super.key,
@@ -22,6 +24,8 @@ class RegisterStep2 extends StatefulWidget {
     required this.job,
     required this.dinasId,
     required this.desaId,
+    required this.email,
+    required this.telepon,
   });
 
   @override
@@ -153,21 +157,29 @@ class _RegisterStep2State extends State<RegisterStep2>
       _showSnackBar('Password harus mengandung simbol (!@#\$%&*)');
       return;
     }
-    if (password != confirmPassword) {
+        if (password != confirmPassword) {
       _shakePasswordField();
       _showSnackBar('Konfirmasi password tidak cocok');
       return;
     }
-    if (_teleponCtrl.text.isEmpty) {
+
+    final telepon = _teleponCtrl.text.trim();
+    final email = _emailCtrl.text.trim().toLowerCase();
+
+    if (telepon.isEmpty) {
       _showSnackBar('No telepon harus diisi');
       return;
     }
-    if (_emailCtrl.text.isEmpty || !_emailCtrl.text.contains('@')) {
-      _showSnackBar('Email tidak valid');
+    if (!RegExp(r'^[0-9]{12,13}$').hasMatch(telepon)) {
+      _showSnackBar('No telepon harus 12 sampai 13 angka');
       return;
     }
-    if (widget.desaId == null || widget.desaId!.isEmpty) {
-      _showSnackBar('Desa/Kelurahan wajib dipilih');
+    if (email.isEmpty) {
+      _showSnackBar('Email harus diisi');
+      return;
+    }
+    if (!RegExp(r'^[a-z0-9._%+\-]+@gmail\.com$').hasMatch(email)) {
+      _showSnackBar('Email harus menggunakan @gmail.com');
       return;
     }
 

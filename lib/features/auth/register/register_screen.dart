@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../../../config/api_config.dart';
+import 'package:flutter/services.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -434,6 +435,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyName: 'telepon',
                 icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(13),
+                ],
               ),
               const SizedBox(height: 20),
               _buildTextField(
@@ -676,13 +681,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildTextField({
+    Widget _buildTextField({
     required String label,
     required String hint,
     required String keyName,
     required IconData icon,
     TextInputType? keyboardType,
     int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,   // ← ditambah
   }) {
     final controller = _getController(
       keyName,
@@ -712,6 +718,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             controller: controller,
             keyboardType: keyboardType,
             maxLines: maxLines,
+            inputFormatters: inputFormatters,
             style: const TextStyle(fontFamily: 'Poppins'),
             decoration: InputDecoration(
               hintText: hint,
@@ -1394,16 +1401,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   bool _validateStep2() {
-    if ((_formData['telepon'] ?? '').isEmpty) {
+    final telepon = (_formData['telepon'] ?? '').trim();
+    final email = (_formData['email'] ?? '').trim().toLowerCase();
+
+    if (telepon.isEmpty) {
       _showError('No telepon wajib diisi');
       return false;
     }
-    if ((_formData['email'] ?? '').isEmpty) {
+    if (!RegExp(r'^08[0-9]{10,11}$').hasMatch(telepon)) {
+      _showError('No telepon harus 12 sampai 13 angka dan di awali dengan 08');
+      return false;
+    }
+    if (email.isEmpty) {
       _showError('Email wajib diisi');
       return false;
     }
-    if (!(_formData['email'] ?? '').contains('@')) {
-      _showError('Email tidak valid');
+    if (!RegExp(r'^[a-z0-9._%+\-]+@gmail\.com$').hasMatch(email)) {
+      _showError('Email harus menggunakan @gmail.com');
       return false;
     }
     return true;
@@ -1441,10 +1455,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final requestData = {
         'tipe': tipeUser,
         'nama': _formData['nama'],
-        'email': _formData['email'],
+        'email': (_formData['email'] ?? '').trim().toLowerCase(),
         'password': password,
         'password_confirmation': konfirmasiPassword,
-        'no_telepon': _formData['telepon'],
+        'no_telepon': (_formData['telepon'] ?? '').trim(),
         'jenis_kelamin': _formData['gender'],
         'tanggal_lahir': _formData['tglLahir'] != null
             ? DateFormat('yyyy-MM-dd').format(_formData['tglLahir'])
@@ -1463,7 +1477,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final response = await http.post(
         Uri.parse(ApiConfig.register),
-        headers: {'Content-Type': 'application/json'},
+        headers: ApiConfig.headers,
         body: jsonEncode(requestData),
       );
 

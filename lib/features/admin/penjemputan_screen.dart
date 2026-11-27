@@ -332,10 +332,10 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
       request.headers.addAll({'Accept': 'application/json'});
       request.fields['id_petugas'] = adminId.toString();
       request.fields['nama_admin'] =
-          _adminData?['nama'] ?? _adminData?['nama_lengkap'] ?? 'Admin';
+      _adminData?['nama'] ?? _adminData?['nama_lengkap'] ?? 'Admin';
       request.fields['waktu'] = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
       request.fields['lokasi'] = _lokasiCtrl.text;
-      request.fields['berat'] = _beratCtrl.text;
+      request.fields['berat'] = _beratCtrl.text.trim().replaceAll(',', '.');
       request.fields['keterangan'] = _keteranganCtrl.text;
       request.fields['status'] = 'diproses';
       if (_imageFile != null) {
@@ -714,8 +714,11 @@ class _PenjemputanScreenState extends State<PenjemputanScreen> {
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
             validator: (v) {
-              if (v == null || v.isEmpty) return 'Berat wajib diisi';
-              if (double.tryParse(v) == null) return 'Masukkan angka valid';
+              if (v == null || v.trim().isEmpty) return 'Berat wajib diisi';
+              final n = double.tryParse(v.trim().replaceAll(',', '.'));
+              if (n == null) return 'Masukkan angka yang valid';
+              if (n < 0.1) return 'Berat minimal 0,1 kg';
+              if (n > 1000) return 'Berat maksimal 1000 kg';
               return null;
             },
           ),

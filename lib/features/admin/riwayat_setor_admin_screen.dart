@@ -426,7 +426,7 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
                       const SizedBox(height: 4),
                       Text(
                         _formatRupiah(
-                          (double.tryParse(beratCtrl.text) ?? 0) * hargaPerKg,
+                          (double.tryParse(beratCtrl.text.trim().replaceAll(',', '.')) ?? 0) * hargaPerKg,
                         ),
                         style: const TextStyle(
                           fontSize: 22,
@@ -494,18 +494,26 @@ class _RiwayatSetorAdminScreenState extends State<RiwayatSetorAdminScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                final berat = double.tryParse(beratCtrl.text);
-                if (berat == null || berat <= 0) {
+                final berat = double.tryParse(beratCtrl.text.trim().replaceAll(',', '.'));
+                String? pesanError;
+                if (berat == null) {
+                  pesanError = 'Masukkan berat yang valid';
+                } else if (berat < 0.1) {
+                  pesanError = 'Berat minimal 0,1 kg';
+                } else if (berat > 1000) {
+                  pesanError = 'Berat maksimal 1000 kg';
+                }
+                if (pesanError != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Berat harus lebih dari 0'),
+                    SnackBar(
+                      content: Text(pesanError),
                       backgroundColor: Colors.red,
                     ),
                   );
                   return;
                 }
                 Navigator.pop(ctx);
-                _konfirmasiSetor(item['id_transaksi'], selectedJenisId, berat);
+                _konfirmasiSetor(item['id_transaksi'], selectedJenisId, berat!);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),
