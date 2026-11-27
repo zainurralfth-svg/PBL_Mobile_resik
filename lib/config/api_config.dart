@@ -10,7 +10,7 @@ class ApiConfig {
       // 📱 Android Emulator  → 'http://10.0.2.2:8000'
       // 🍎 iOS Simulator/Web → 'http://localhost:8000'
       // 📱 HP Fisikal (WiFi) → 'http://192.168.1.xx:8000' (ganti xx dengan IP Laptop)
-      return 'http://localhost:8000';
+      return 'http://localhost:8000'; // ganti dengan IPv4 laptop kamu
     }
   }
 
@@ -91,6 +91,8 @@ class ApiConfig {
   static String get petugasB3Muatan => '$baseUrl/petugas/b3-muatan';
   static String get petugasB3RuteSelesai => '$baseUrl/petugas/b3-rute/selesai';
   static String get petugasB3Riwayat => '$baseUrl/petugas/b3-riwayat';
+  static String petugasB3TaskTidakAda(dynamic idTask) =>
+      '$baseUrl/petugas/b3-tasks/$idTask/tidak-ada';
 
   // ==================== 📍 INFO TPS ====================
   static String get infoTps => '$baseUrl/tps';

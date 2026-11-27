@@ -107,7 +107,7 @@ class _FormTransaksiSetorScreenV2State
   }
 
   void _hitungTotal() {
-    final berat = double.tryParse(_beratCtrl.text) ?? 0;
+    final berat = double.tryParse(_beratCtrl.text.trim().replaceAll(',', '.')) ?? 0;
     setState(() {
       _totalHarga = berat * _hargaPerKg;
     });
@@ -160,7 +160,7 @@ class _FormTransaksiSetorScreenV2State
         'id_pns': widget.userData['id_pns'],
         'id_petugas': petugasData['id_petugas'],
         'id_jenis_sampah': int.parse(_selectedJenisSampah!),
-        'berat': double.parse(_beratCtrl.text),
+        'berat': double.parse(_beratCtrl.text.trim().replaceAll(',', '.')),
         'harga_per_kg': _hargaPerKg,
         'total_rupiah': _totalHarga,
         'tanggal_transaksi': _formatDateTimeForBackend(DateTime.now()),
@@ -832,15 +832,15 @@ class _FormTransaksiSetorScreenV2State
               ),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) {
+              if (value == null || value.trim().isEmpty) {
                 return 'Masukkan berat sampah';
               }
-              if (double.tryParse(value) == null) {
+              final n = double.tryParse(value.trim().replaceAll(',', '.'));
+              if (n == null) {
                 return 'Masukkan angka yang valid';
               }
-              if (double.parse(value) <= 0) {
-                return 'Berat harus lebih dari 0';
-              }
+              if (n < 0.1) return 'Berat minimal 0,1 kg';
+              if (n > 1000) return 'Berat maksimal 1000 kg';
               return null;
             },
           ),
@@ -897,7 +897,7 @@ class _FormTransaksiSetorScreenV2State
           const SizedBox(height: 8),
           _buildPriceRow(
             'Berat',
-            '${double.tryParse(_beratCtrl.text)?.toStringAsFixed(1) ?? '0.0'} kg',
+            '${double.tryParse(_beratCtrl.text.trim().replaceAll(',', '.'))?.toStringAsFixed(1) ?? '0.0'} kg',
             false,
           ),
           const SizedBox(height: 12),

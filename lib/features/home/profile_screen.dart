@@ -353,15 +353,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
         }
-      } else {
-        print('❌ HTTP Error: ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Server Error: ${response.statusCode}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+        } else {
+          print('❌ HTTP Error: ${response.statusCode}');
+          String pesan = 'Server Error: ${response.statusCode}';
+          try {
+            final body = jsonDecode(response.body);
+            if (body is Map && body['message'] != null) {
+              pesan = body['message'].toString();
+            }
+          } catch (_) {}
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(pesan),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -400,13 +407,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'Accept': 'application/json',
           if (token != null && token.isNotEmpty)
             'Authorization': 'Bearer $token',
-        },
+        });
+
+      final telp = _telpCtrl.text.trim();
+        if (telp.isNotEmpty && !RegExp(r'^[0-9]{12,13}$').hasMatch(telp)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No telepon harus 12 sampai 13 angka')),
+          );
+          return;
+        }
         body: jsonEncode({
           'user_id': userId,
           'tipe': tipe,
           'no_telepon': _telpCtrl.text,
-        }),
-      );
+        });
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
