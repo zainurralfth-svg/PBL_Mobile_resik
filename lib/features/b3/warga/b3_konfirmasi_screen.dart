@@ -15,7 +15,7 @@ class B3KonfirmasiScreen extends StatelessWidget {
 
   const B3KonfirmasiScreen({super.key, this.data = const B3FormData()});
 
-  static const _green = Color(0xFF2E7D32);
+  static const _green = Color.fromARGB(255, 193, 223, 205);
   static const _greenDark = Color(0xFF1B5E20);
   static const _cream = Color(0xFFFAF4DC);
   static const _card = Color(0xFFFFFDF5);
@@ -25,7 +25,7 @@ class B3KonfirmasiScreen extends StatelessWidget {
 
   void _kirim(BuildContext context) {
     // TODO: panggil backend di sini nanti, lalu pindah ke W6 kalau sukses.
-    Navigator.pushReplacement(
+    Navigator.pushReplacement( 
       context,
       MaterialPageRoute(builder: (_) => B3TerkirimScreen(data: data)),
     );
